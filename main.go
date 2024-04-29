@@ -1,7 +1,7 @@
 package main
 
-import "fmt"
+import "kevwargo/ec2-playground/cmd"
 
 func main() {
-	fmt.Println("EC2 Playground")
+	cmd.Execute()
 }
