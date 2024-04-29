@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"log"
+
 	"github.com/spf13/cobra"
 
 	"kevwargo/ec2-playground/cmd/exec"
@@ -27,5 +29,7 @@ func Execute() {
 	rootCmd.AddCommand(stop.Command())
 	rootCmd.AddCommand(ssh.Command())
 
-	rootCmd.Execute()
+	if err := rootCmd.Execute(); err != nil {
+		log.Fatal(err)
+	}
 }
