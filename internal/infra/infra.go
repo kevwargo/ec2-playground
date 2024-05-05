@@ -15,6 +15,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/cloudformation"
 	"github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
 	"github.com/aws/smithy-go"
+
+	"kevwargo/ec2-playground/internal/config"
 )
 
 //go:embed template.yml
@@ -49,12 +51,12 @@ type Fetcher struct {
 	log        *log.Logger
 }
 
-func NewFetcher(cfg aws.Config, stackName string, skipDeploy bool) Fetcher {
+func NewFetcher(awsCfg aws.Config, runCfg config.RunConfig) Fetcher {
 	return Fetcher{
-		cfn:        cloudformation.NewFromConfig(cfg),
-		stackName:  stackName,
-		skipDeploy: skipDeploy,
-		log:        log.New(os.Stderr, fmt.Sprintf("%s: ", cfg.Region), log.LstdFlags),
+		cfn:        cloudformation.NewFromConfig(awsCfg),
+		stackName:  runCfg.InfraStackName,
+		skipDeploy: runCfg.SkipInfraDeploy,
+		log:        log.New(os.Stderr, fmt.Sprintf("%s: ", awsCfg.Region), log.LstdFlags),
 	}
 }
 
