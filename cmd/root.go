@@ -36,7 +36,7 @@ func Execute() {
 
 	rootCmd.PersistentFlags().StringSliceVarP(&cfg.Regions, "regions", "r", nil, "List of regions, comma-separated")
 
-	rootCmd.AddCommand(run.Command())
+	rootCmd.AddCommand(run.Command(&sess))
 	rootCmd.AddCommand(ls.Command(&sess))
 	rootCmd.AddCommand(exec.Command())
 	rootCmd.AddCommand(rm.Command())

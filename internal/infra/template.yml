@@ -1,0 +1,172 @@
+Description:
+  A set of resources used by the EC2 Playground
+
+Parameters:
+  DefaultVPC:
+    Type: String
+    Default: ""
+
+  CidrBlock:
+    Type: String
+    Default: 10.0.0.0/20
+
+Conditions:
+  CreateVPC: !Equals
+    - !Ref DefaultVPC
+    - ""
+
+Resources:
+  VPC:
+    Condition: CreateVPC
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref CidrBlock
+      Tags:
+        - Key: Name
+          Value: vm-testing
+
+  IGW:
+    Condition: CreateVPC
+    Type: AWS::EC2::InternetGateway
+
+  VPC2Internet:
+    Condition: CreateVPC
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref IGW
+      VpcId: !Ref VPC
+
+  IPv6Cidr:
+    Condition: CreateVPC
+    Type: AWS::EC2::VPCCidrBlock
+    Properties:
+      AmazonProvidedIpv6CidrBlock: true
+      VpcId: !Ref VPC
+
+  Subnet:
+    Condition: CreateVPC
+    Type: AWS::EC2::Subnet
+    DependsOn: IPv6Cidr
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: !Ref CidrBlock
+      AssignIpv6AddressOnCreation: true
+      Ipv6CidrBlock: !Select
+        - 0
+        - !Cidr
+          - !Select [0, !GetAtt VPC.Ipv6CidrBlocks]
+          - 1
+          - 64
+
+  RouteTable:
+    Condition: CreateVPC
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+
+  SubnetRTAssociation:
+    Condition: CreateVPC
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref RouteTable
+      SubnetId: !Ref Subnet
+
+  RouteIPv4:
+    Condition: CreateVPC
+    Type: AWS::EC2::Route
+    DependsOn:
+      - VPC2Internet
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref IGW
+      RouteTableId: !Ref RouteTable
+
+  RouteIPv6:
+    Condition: CreateVPC
+    Type: AWS::EC2::Route
+    DependsOn:
+      - VPC2Internet
+    Properties:
+      DestinationIpv6CidrBlock: ::/0
+      GatewayId: !Ref IGW
+      RouteTableId: !Ref RouteTable
+
+  SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      VpcId: !If
+        - CreateVPC
+        - !Ref VPC
+        - !Ref DefaultVPC
+      GroupDescription: VMTest
+      SecurityGroupEgress:
+        - CidrIp: 0.0.0.0/0
+          IpProtocol: -1
+        - CidrIpv6: ::0/0
+          IpProtocol: -1
+      SecurityGroupIngress:
+        - CidrIp: 0.0.0.0/0
+          IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+        - CidrIp: 0.0.0.0/0
+          IpProtocol: tcp
+          FromPort: 3389
+          ToPort: 3389
+
+  Bucket:
+    Type: AWS::S3::Bucket
+
+  InstancePolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              - s3:PutObject
+              - s3:PutObjectAcl
+            Resource:
+              - !Sub 'arn:aws:s3:::${Bucket}/*'
+          - Effect: Allow
+            Action:
+              - ssm:PutParameter
+            Resource: "*"
+
+  InstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+      ManagedPolicyArns:
+        - !Ref InstancePolicy
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+
+  InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - !Ref InstanceRole
+
+Outputs:
+  SecurityGroup:
+    Value: !Ref SecurityGroup
+
+  Subnet:
+    Condition: CreateVPC
+    Value: !Ref Subnet
+
+  InstancePolicy:
+    Value: !Ref InstancePolicy
+
+  InstanceProfile:
+    Value: !Ref InstanceProfile
+
+  Bucket:
+    Value: !Ref Bucket
