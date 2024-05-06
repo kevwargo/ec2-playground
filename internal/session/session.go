@@ -3,10 +3,12 @@ package session
 import (
 	"context"
 	"errors"
+	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
+	"github.com/aws/aws-sdk-go-v2/service/iam"
 )
 
 type Config struct {
@@ -14,7 +16,9 @@ type Config struct {
 }
 
 type Session struct {
-	configs []aws.Config
+	configs  []aws.Config
+	iam      *iam.Client
+	iamMutex sync.Mutex
 }
 
 func New(ctx context.Context, cfg *Config) (Session, error) {
@@ -22,15 +26,18 @@ func New(ctx context.Context, cfg *Config) (Session, error) {
 	if err != nil {
 		return Session{}, err
 	}
+	if len(awsConfigs) == 0 {
+		return Session{}, errors.New("couldn't find a usable AWS region")
+	}
 
 	return Session{configs: awsConfigs}, nil
 }
 
-func (s Session) Run(ctx context.Context, handler func(context.Context, aws.Config) error) error {
+func (s *Session) Run(ctx context.Context, run func(context.Context, aws.Config) error) error {
 	errsC := make(chan error)
 	for _, cfg := range s.configs {
 		go func(cfg aws.Config) {
-			errsC <- handler(ctx, cfg)
+			errsC <- run(ctx, cfg)
 		}(cfg)
 	}
 
@@ -41,6 +48,17 @@ func (s Session) Run(ctx context.Context, handler func(context.Context, aws.Conf
 	}
 
 	return errors.Join(errs...)
+}
+
+func (s *Session) RunIAM(ctx context.Context, run func(context.Context, *iam.Client) error) error {
+	s.iamMutex.Lock()
+	defer s.iamMutex.Unlock()
+
+	if s.iam == nil {
+		s.iam = iam.NewFromConfig(s.configs[0])
+	}
+
+	return run(ctx, s.iam)
 }
 
 func resolveConfigs(ctx context.Context, regions []string) ([]aws.Config, error) {

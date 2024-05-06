@@ -7,9 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"os"
 	"regexp"
-	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/cloudformation"
@@ -33,7 +31,6 @@ var (
 
 const (
 	errCodeValidation = "ValidationError"
-	statInProgress    = "_IN_PROGRESS"
 )
 
 type Resources struct {
@@ -51,12 +48,12 @@ type Fetcher struct {
 	log        *log.Logger
 }
 
-func NewFetcher(awsCfg aws.Config, runCfg config.RunConfig) Fetcher {
+func NewFetcher(awsCfg aws.Config, runCfg config.RunConfig, logger *log.Logger) Fetcher {
 	return Fetcher{
 		cfn:        cloudformation.NewFromConfig(awsCfg),
 		stackName:  runCfg.InfraStackName,
 		skipDeploy: runCfg.SkipInfraDeploy,
-		log:        log.New(os.Stderr, fmt.Sprintf("%s: ", awsCfg.Region), log.LstdFlags),
+		log:        logger,
 	}
 }
 
@@ -157,7 +154,7 @@ func (f Fetcher) handleValidationError(ctx context.Context, err error) (string, 
 	if m := errMsgInvalidState.FindStringSubmatch(msg); m != nil {
 		stackID, stackStatus := m[1], m[2]
 
-		if strings.HasSuffix(stackStatus, statInProgress) {
+		if inProgress(stackStatus) {
 			f.log.Printf("Stack %q is %s, waiting for completion", f.stackName, stackStatus)
 			return stackID, nil
 		}

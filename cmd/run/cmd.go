@@ -2,13 +2,13 @@ package run
 
 import (
 	"context"
-	"log"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/spf13/cobra"
 
 	"kevwargo/ec2-playground/internal/config"
 	"kevwargo/ec2-playground/internal/infra"
+	"kevwargo/ec2-playground/internal/runner"
 	"kevwargo/ec2-playground/internal/session"
 )
 
@@ -16,14 +16,15 @@ func Command(sess *session.Session) *cobra.Command {
 	var runCfg config.RunConfig
 
 	cmd := &cobra.Command{
-		Use:           "run",
+		Use:           "run image1 [image2...]",
 		SilenceErrors: true,
 		SilenceUsage:  true,
 		Args:          cobra.MinimumNArgs(1),
 		RunE: func(c *cobra.Command, images []string) error {
 			return sess.Run(c.Context(), func(ctx context.Context, awsCfg aws.Config) error {
 				runCfg.Images = images
-				return runInstances(ctx, infra.NewFetcher(awsCfg, runCfg))
+				r := runner.New(awsCfg, runCfg, sess)
+				return r.RunInstances(ctx)
 			})
 		},
 	}
@@ -52,16 +53,6 @@ func Command(sess *session.Session) *cobra.Command {
 	f.BoolVarP(&runCfg.DryRun, "dry-run", "d", false, "Dry run operation")
 
 	return cmd
-}
-
-func runInstances(ctx context.Context, infraFetcher infra.Fetcher) error {
-	resources, err := infraFetcher.Fetch(ctx)
-	if err != nil {
-		return err
-	}
-
-	log.Printf("infra: %+v", resources)
-	return nil
 }
 
 const (

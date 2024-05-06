@@ -23,7 +23,7 @@ Resources:
       CidrBlock: !Ref CidrBlock
       Tags:
         - Key: Name
-          Value: vm-testing
+          Value: ec2-playground
 
   IGW:
     Condition: CreateVPC
@@ -98,7 +98,7 @@ Resources:
         - CreateVPC
         - !Ref VPC
         - !Ref DefaultVPC
-      GroupDescription: VMTest
+      GroupDescription: EC2Playground
       SecurityGroupEgress:
         - CidrIp: 0.0.0.0/0
           IpProtocol: -1

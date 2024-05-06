@@ -15,9 +15,10 @@ import (
 const (
 	waitInterval      = 2 * time.Second
 	resourceTypeStack = "AWS::CloudFormation::Stack"
+	statInProgress    = "_IN_PROGRESS"
 )
 
-type stackWaiter struct {
+type statusWaiter struct {
 	cfn             *cloudformation.Client
 	stackID         string
 	lastEventID     string
@@ -26,7 +27,7 @@ type stackWaiter struct {
 }
 
 func (f Fetcher) wait(ctx context.Context, stackID string, statuses ...types.StackStatus) error {
-	w := stackWaiter{
+	w := statusWaiter{
 		cfn:             f.cfn,
 		stackID:         stackID,
 		desiredStatuses: statuses,
@@ -36,7 +37,7 @@ func (f Fetcher) wait(ctx context.Context, stackID string, statuses ...types.Sta
 	return w.wait(ctx)
 }
 
-func (w *stackWaiter) wait(ctx context.Context) error {
+func (w *statusWaiter) wait(ctx context.Context) error {
 	status, err := w.getStatus(ctx)
 	if err != nil {
 		return err
@@ -68,7 +69,7 @@ func (w *stackWaiter) wait(ctx context.Context) error {
 	return fmt.Errorf("Stack %q finished with unexpected status %s", w.stackID, status)
 }
 
-func (w *stackWaiter) getStatus(ctx context.Context) (types.StackStatus, error) {
+func (w *statusWaiter) getStatus(ctx context.Context) (types.StackStatus, error) {
 	resp, err := w.cfn.DescribeStacks(ctx, &cloudformation.DescribeStacksInput{
 		StackName: &w.stackID,
 	})
@@ -79,7 +80,7 @@ func (w *stackWaiter) getStatus(ctx context.Context) (types.StackStatus, error) 
 	return resp.Stacks[0].StackStatus, nil
 }
 
-func (w *stackWaiter) logEvents(ctx context.Context) error {
+func (w *statusWaiter) logEvents(ctx context.Context) error {
 	events, err := w.listNewEvents(ctx)
 	if err != nil {
 		return err
@@ -100,7 +101,7 @@ func (w *stackWaiter) logEvents(ctx context.Context) error {
 	return nil
 }
 
-func (w *stackWaiter) listNewEvents(ctx context.Context) ([]types.StackEvent, error) {
+func (w *statusWaiter) listNewEvents(ctx context.Context) ([]types.StackEvent, error) {
 	paginator := cloudformation.NewDescribeStackEventsPaginator(w.cfn, &cloudformation.DescribeStackEventsInput{
 		StackName: &w.stackID,
 	})
@@ -129,6 +130,6 @@ func (w *stackWaiter) listNewEvents(ctx context.Context) ([]types.StackEvent, er
 	return events, nil
 }
 
-func inProgress(status types.StackStatus) bool {
+func inProgress[T ~string](status T) bool {
 	return strings.HasSuffix(string(status), statInProgress)
 }
