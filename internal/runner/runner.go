@@ -2,6 +2,7 @@ package runner
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -13,16 +14,18 @@ import (
 
 	"kevwargo/ec2-playground/internal/config"
 	"kevwargo/ec2-playground/internal/format"
+	"kevwargo/ec2-playground/internal/images"
 	"kevwargo/ec2-playground/internal/infra"
 	"kevwargo/ec2-playground/internal/session"
 )
 
 type InstanceRunner struct {
-	cfg          config.RunConfig
-	ec2          *ec2.Client
-	sess         *session.Session
-	infraFetcher infra.Fetcher
-	formatter    format.Formatter
+	cfg           config.RunConfig
+	ec2           *ec2.Client
+	sess          *session.Session
+	infraFetcher  infra.Fetcher
+	formatter     format.Formatter
+	imageResolver images.Resolver
 }
 
 func New(awsCfg aws.Config, runCfg config.RunConfig, sess *session.Session) InstanceRunner {
@@ -30,11 +33,12 @@ func New(awsCfg aws.Config, runCfg config.RunConfig, sess *session.Session) Inst
 	ssmClient := ssm.NewFromConfig(awsCfg)
 
 	return InstanceRunner{
-		cfg:          runCfg,
-		ec2:          ec2Client,
-		sess:         sess,
-		infraFetcher: infra.NewFetcher(awsCfg, runCfg),
-		formatter:    format.New(awsCfg.Region, ec2Client, ssmClient, runCfg.DumpFormat.Template()),
+		cfg:           runCfg,
+		ec2:           ec2Client,
+		sess:          sess,
+		infraFetcher:  infra.NewFetcher(awsCfg, runCfg),
+		formatter:     format.New(awsCfg.Region, ec2Client, ssmClient, runCfg.DumpFormat.Template()),
+		imageResolver: images.NewResolver(ssmClient),
 	}
 }
 
@@ -49,16 +53,30 @@ func (r InstanceRunner) RunInstances(ctx context.Context) error {
 		return err
 	}
 
-	for idx := range inputs {
-		resp, err := r.ec2.RunInstances(ctx, &inputs[idx])
-		if err != nil {
-			return err
-		}
+	errC := make(chan error)
+	for _, input := range inputs {
+		go func(in ec2.RunInstancesInput) {
+			errC <- r.runInstances(ctx, in)
+		}(input)
+	}
 
-		for _, instance := range resp.Instances {
-			if err := r.formatter.Print(ctx, instance); err != nil {
-				return err
-			}
+	errs := make([]error, len(inputs))
+	for idx := range errs {
+		errs[idx] = <-errC
+	}
+
+	return errors.Join(errs...)
+}
+
+func (r InstanceRunner) runInstances(ctx context.Context, input ec2.RunInstancesInput) error {
+	resp, err := r.ec2.RunInstances(ctx, &input)
+	if err != nil {
+		return err
+	}
+
+	for _, instance := range resp.Instances {
+		if err := r.formatter.Print(ctx, instance); err != nil {
+			return err
 		}
 	}
 
@@ -77,8 +95,13 @@ func (r InstanceRunner) buildInputs(ctx context.Context, resources infra.Resourc
 	}
 
 	var inputs []ec2.RunInstancesInput
-	for idx := range r.cfg.Images {
-		in.ImageId = &r.cfg.Images[idx]
+	for _, image := range r.cfg.Images {
+		imageId, err := r.imageResolver.Resolve(ctx, image)
+		if err != nil {
+			return nil, err
+		}
+
+		in.ImageId = &imageId
 		inputs = append(inputs, in)
 	}
 
