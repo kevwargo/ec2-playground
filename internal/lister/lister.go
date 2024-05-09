@@ -3,8 +3,6 @@ package lister
 import (
 	"context"
 	"errors"
-	"log"
-	"os"
 	"slices"
 	"text/template"
 
@@ -19,7 +17,6 @@ import (
 type InstanceLister struct {
 	ec2Client *ec2.Client
 	formatter format.Formatter
-	printer   *log.Logger
 }
 
 func New(cfg aws.Config, formatTemplate *template.Template) InstanceLister {
@@ -30,7 +27,6 @@ func New(cfg aws.Config, formatTemplate *template.Template) InstanceLister {
 	return InstanceLister{
 		ec2Client: ec2Client,
 		formatter: formatter,
-		printer:   log.New(os.Stdout, "", 0),
 	}
 }
 
@@ -44,12 +40,9 @@ func (l InstanceLister) ListInstances(ctx context.Context) error {
 
 		for _, reservation := range page.Reservations {
 			for _, instance := range reservation.Instances {
-				formatted, err := l.formatter.Format(ctx, instance)
-				if err != nil {
+				if err := l.formatter.Print(ctx, instance); err != nil {
 					return err
 				}
-
-				l.printer.Println(formatted)
 			}
 		}
 	}

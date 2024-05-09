@@ -3,8 +3,6 @@ package runner
 import (
 	"context"
 	"fmt"
-	"log"
-	"os"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -25,7 +23,6 @@ type InstanceRunner struct {
 	sess         *session.Session
 	infraFetcher infra.Fetcher
 	formatter    format.Formatter
-	printer      *log.Logger
 }
 
 func New(awsCfg aws.Config, runCfg config.RunConfig, sess *session.Session) InstanceRunner {
@@ -38,7 +35,6 @@ func New(awsCfg aws.Config, runCfg config.RunConfig, sess *session.Session) Inst
 		sess:         sess,
 		infraFetcher: infra.NewFetcher(awsCfg, runCfg),
 		formatter:    format.New(awsCfg.Region, ec2Client, ssmClient, runCfg.DumpFormat.Template()),
-		printer:      log.New(os.Stdout, "", 0),
 	}
 }
 
@@ -60,12 +56,9 @@ func (r InstanceRunner) RunInstances(ctx context.Context) error {
 		}
 
 		for _, instance := range resp.Instances {
-			formatted, err := r.formatter.Format(ctx, instance)
-			if err != nil {
+			if err := r.formatter.Print(ctx, instance); err != nil {
 				return err
 			}
-
-			r.printer.Println(formatted)
 		}
 	}
 
