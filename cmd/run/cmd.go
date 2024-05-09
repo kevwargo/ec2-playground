@@ -23,8 +23,7 @@ func Command(sess *session.Session) *cobra.Command {
 		RunE: func(c *cobra.Command, images []string) error {
 			return sess.Run(c.Context(), func(ctx context.Context, awsCfg aws.Config) error {
 				runCfg.Images = images
-				r := runner.New(awsCfg, runCfg, sess)
-				return r.RunInstances(ctx)
+				return runner.New(awsCfg, runCfg, sess).RunInstances(ctx)
 			})
 		},
 	}
@@ -49,7 +48,7 @@ func Command(sess *session.Session) *cobra.Command {
 	f.StringVar(&runCfg.InfraStackName, "infra-stack", infra.DefaultStackName, "Infra stack name")
 	f.BoolVar(&runCfg.SkipInfraDeploy, "skip-infra-deploy", false, "Don't attempt to deploy the infra stack")
 
-	f.StringVarP(&runCfg.DumpFormat, "dump-format", "f", "", "Format for printing new instances")
+	f.VarP(&runCfg.DumpFormat, "dump-format", "f", "Format for printing new instances")
 	f.BoolVarP(&runCfg.DryRun, "dry-run", "d", false, "Dry run operation")
 
 	return cmd

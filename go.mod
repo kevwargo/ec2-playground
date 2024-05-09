@@ -8,6 +8,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/cloudformation v1.50.0
 	github.com/aws/aws-sdk-go-v2/service/ec2 v1.159.0
 	github.com/aws/aws-sdk-go-v2/service/iam v1.32.0
+	github.com/aws/aws-sdk-go-v2/service/ssm v1.50.0
 	github.com/aws/smithy-go v1.20.2
 	github.com/spf13/cobra v1.8.0
 )

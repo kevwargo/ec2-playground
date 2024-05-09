@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"os"
 	"regexp"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -48,12 +49,12 @@ type Fetcher struct {
 	log        *log.Logger
 }
 
-func NewFetcher(awsCfg aws.Config, runCfg config.RunConfig, logger *log.Logger) Fetcher {
+func NewFetcher(awsCfg aws.Config, runCfg config.RunConfig) Fetcher {
 	return Fetcher{
 		cfn:        cloudformation.NewFromConfig(awsCfg),
 		stackName:  runCfg.InfraStackName,
 		skipDeploy: runCfg.SkipInfraDeploy,
-		log:        logger,
+		log:        log.New(os.Stderr, fmt.Sprintf("%s: ", awsCfg.Region), log.LstdFlags),
 	}
 }
 

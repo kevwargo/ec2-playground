@@ -11,8 +11,10 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	"github.com/aws/aws-sdk-go-v2/service/iam"
+	"github.com/aws/aws-sdk-go-v2/service/ssm"
 
 	"kevwargo/ec2-playground/internal/config"
+	"kevwargo/ec2-playground/internal/format"
 	"kevwargo/ec2-playground/internal/infra"
 	"kevwargo/ec2-playground/internal/session"
 )
@@ -22,22 +24,25 @@ type InstanceRunner struct {
 	ec2          *ec2.Client
 	sess         *session.Session
 	infraFetcher infra.Fetcher
-	log          *log.Logger
+	formatter    format.Formatter
+	printer      *log.Logger
 }
 
 func New(awsCfg aws.Config, runCfg config.RunConfig, sess *session.Session) InstanceRunner {
-	logger := log.New(os.Stderr, fmt.Sprintf("%s: ", awsCfg.Region), log.LstdFlags)
+	ec2Client := ec2.NewFromConfig(awsCfg)
+	ssmClient := ssm.NewFromConfig(awsCfg)
 
 	return InstanceRunner{
 		cfg:          runCfg,
-		ec2:          ec2.NewFromConfig(awsCfg),
+		ec2:          ec2Client,
 		sess:         sess,
-		infraFetcher: infra.NewFetcher(awsCfg, runCfg, logger),
-		log:          logger,
+		infraFetcher: infra.NewFetcher(awsCfg, runCfg),
+		formatter:    format.New(awsCfg.Region, ec2Client, ssmClient, runCfg.DumpFormat.Template()),
+		printer:      log.New(os.Stdout, "", 0),
 	}
 }
 
-func (r *InstanceRunner) RunInstances(ctx context.Context) error {
+func (r InstanceRunner) RunInstances(ctx context.Context) error {
 	resources, err := r.infraFetcher.Fetch(ctx)
 	if err != nil {
 		return err
@@ -55,7 +60,12 @@ func (r *InstanceRunner) RunInstances(ctx context.Context) error {
 		}
 
 		for _, instance := range resp.Instances {
-			r.log.Print(*instance.InstanceId)
+			formatted, err := r.formatter.Format(ctx, instance)
+			if err != nil {
+				return err
+			}
+
+			r.printer.Println(formatted)
 		}
 	}
 
