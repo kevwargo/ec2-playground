@@ -2,7 +2,6 @@ package format
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
@@ -16,14 +15,14 @@ type instanceData struct {
 	Region string
 	I      types.Instance
 
-	ctx         context.Context
-	ssm         *ssm.Client
-	ssmInstance *ssmtypes.InstanceInformation
+	ctx     context.Context
+	ssm     *ssm.Client
+	ssmInfo *ssmtypes.InstanceInformation
 }
 
 func (i *instanceData) SSM() (*ssmtypes.InstanceInformation, error) {
-	if i.ssmInstance != nil {
-		return i.ssmInstance, nil
+	if i.ssmInfo != nil {
+		return i.ssmInfo, nil
 	}
 
 	resp, err := i.ssm.DescribeInstanceInformation(i.ctx, &ssm.DescribeInstanceInformationInput{
@@ -39,10 +38,23 @@ func (i *instanceData) SSM() (*ssmtypes.InstanceInformation, error) {
 	}
 
 	if len(resp.InstanceInformationList) == 0 {
-		return nil, fmt.Errorf("SSM instance %s not found", i.Id)
+		return nil, nil
 	}
 
-	i.ssmInstance = &resp.InstanceInformationList[0]
+	i.ssmInfo = &resp.InstanceInformationList[0]
 
-	return i.ssmInstance, nil
+	return i.ssmInfo, nil
+}
+
+func (i *instanceData) Ping() (string, error) {
+	ssmInfo, err := i.SSM()
+	if err != nil {
+		return "", err
+	}
+
+	if ssmInfo == nil {
+		return "", nil
+	}
+
+	return string(ssmInfo.PingStatus), nil
 }

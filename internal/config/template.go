@@ -10,7 +10,7 @@ type TemplateFlag struct {
 }
 
 func (t *TemplateFlag) String() string {
-	return "template"
+	return defaultFormat
 }
 
 func (t *TemplateFlag) Type() string {
@@ -33,16 +33,18 @@ func (t *TemplateFlag) Template() *template.Template {
 		return t.tmpl
 	}
 
-	return defaultFormat
+	return defaultTemplate
 }
 
-var defaultFormat *template.Template
+const defaultFormat = "{{.Region}} {{.Id}} {{.Name}}"
+
+var defaultTemplate *template.Template
 
 func init() {
-	t, err := template.New("default").Parse("{{.Region}} {{.Id}} {{.Name}}")
+	t, err := template.New("default").Parse(defaultFormat)
 	if err != nil {
 		log.Fatalf("error in default format template: %s", err.Error())
 	}
 
-	defaultFormat = t
+	defaultTemplate = t
 }

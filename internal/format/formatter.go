@@ -37,7 +37,7 @@ func (f Formatter) Format(ctx context.Context, instance types.Instance) (string,
 	}
 
 	var buf bytes.Buffer
-	err := f.tmpl.Execute(&buf, instanceData{
+	err := f.tmpl.Execute(&buf, &instanceData{
 		Id:     *instance.InstanceId,
 		Name:   tags["Name"],
 		Region: f.region,
