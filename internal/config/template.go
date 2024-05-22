@@ -5,19 +5,19 @@ import (
 	"text/template"
 )
 
-type TemplateFlag struct {
+type InstanceFormat struct {
 	tmpl *template.Template
 }
 
-func (t *TemplateFlag) String() string {
+func (t *InstanceFormat) String() string {
 	return defaultFormat
 }
 
-func (t *TemplateFlag) Type() string {
+func (t *InstanceFormat) Type() string {
 	return "template"
 }
 
-func (t *TemplateFlag) Set(raw string) error {
+func (t *InstanceFormat) Set(raw string) error {
 	tmpl, err := template.New("param").Parse(raw)
 	if err != nil {
 		return err
@@ -28,7 +28,7 @@ func (t *TemplateFlag) Set(raw string) error {
 	return nil
 }
 
-func (t *TemplateFlag) Template() *template.Template {
+func (t *InstanceFormat) Template() *template.Template {
 	if t.tmpl != nil {
 		return t.tmpl
 	}
@@ -36,7 +36,7 @@ func (t *TemplateFlag) Template() *template.Template {
 	return defaultTemplate
 }
 
-const defaultFormat = "{{.Region}} {{.Id}} {{.Name}}"
+const defaultFormat = "{{.Region}} {{.Id}} {{.Name}} {{.I.State.Name}}"
 
 var defaultTemplate *template.Template
 

@@ -16,7 +16,7 @@ import (
 var plain = log.New(os.Stdout, "", 0)
 
 func Command(sess *session.Session) *cobra.Command {
-	var dumpFormat config.TemplateFlag
+	var dumpFormat config.InstanceFormat
 
 	cmd := &cobra.Command{
 		Use: "ls",

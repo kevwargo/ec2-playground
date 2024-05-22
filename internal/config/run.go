@@ -13,6 +13,6 @@ type RunConfig struct {
 	UserData         string
 	InfraStackName   string
 	SkipInfraDeploy  bool
-	DumpFormat       TemplateFlag
+	DumpFormat       InstanceFormat
 	DryRun           bool
 }
