@@ -8,6 +8,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
+	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/aws/smithy-go"
 
@@ -40,6 +41,10 @@ func (l InstanceLister) ListInstances(ctx context.Context) error {
 
 		for _, reservation := range page.Reservations {
 			for _, instance := range reservation.Instances {
+				if instance.State.Name == types.InstanceStateNameTerminated {
+					continue
+				}
+
 				if err := l.formatter.Print(ctx, instance); err != nil {
 					return err
 				}
