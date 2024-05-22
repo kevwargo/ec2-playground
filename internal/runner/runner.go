@@ -93,6 +93,10 @@ func (r InstanceRunner) buildInputs(ctx context.Context, resources infra.Resourc
 		return nil, err
 	}
 
+	if err := r.setKeyPair(ctx, &in); err != nil {
+		return nil, err
+	}
+
 	var inputs []ec2.RunInstancesInput
 	for _, image := range r.cfg.Images {
 		imageId, err := r.imageResolver.Resolve(ctx, image)
