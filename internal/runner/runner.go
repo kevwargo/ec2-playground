@@ -9,7 +9,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
-	"github.com/aws/aws-sdk-go-v2/service/iam"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 
 	"kevwargo/ec2-playground/internal/config"
@@ -165,41 +164,6 @@ func (r InstanceRunner) setTags(in *ec2.RunInstancesInput) error {
 			ResourceType: types.ResourceTypeInstance,
 			Tags:         tags,
 		},
-	}
-
-	return nil
-}
-
-func (r InstanceRunner) setProfile(ctx context.Context, in *ec2.RunInstancesInput, resources infra.Resources) error {
-	var profile string
-
-	if r.cfg.Profile != "" {
-		profile = r.cfg.Profile
-	} else if r.cfg.Policy != "" {
-		err := r.sess.RunIAM(ctx, func(ctx context.Context, iamClient *iam.Client) error {
-			builder := profileBuilder{
-				iam:           iamClient,
-				userPolicy:    r.cfg.Policy,
-				defaultPolicy: resources.InstancePolicy,
-				infraName:     r.cfg.InfraStackName,
-			}
-
-			profileName, err := builder.buildProfile(ctx)
-			if err == nil {
-				profile = profileName
-			}
-
-			return err
-		})
-		if err != nil {
-			return err
-		}
-	} else {
-		profile = resources.InstanceProfile
-	}
-
-	in.IamInstanceProfile = &types.IamInstanceProfileSpecification{
-		Name: &profile,
 	}
 
 	return nil
