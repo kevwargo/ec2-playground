@@ -33,34 +33,6 @@ func New(ctx context.Context, cfg *Config) (Session, error) {
 	return Session{configs: awsConfigs}, nil
 }
 
-func (s *Session) Run(ctx context.Context, run func(context.Context, aws.Config) error) error {
-	errsC := make(chan error)
-	for _, cfg := range s.configs {
-		go func(cfg aws.Config) {
-			errsC <- run(ctx, cfg)
-		}(cfg)
-	}
-
-	errs := make([]error, 0, len(s.configs))
-	for len(errs) < len(s.configs) {
-		err := <-errsC
-		errs = append(errs, err)
-	}
-
-	return errors.Join(errs...)
-}
-
-func (s *Session) RunIAM(ctx context.Context, run func(context.Context, *iam.Client) error) error {
-	s.iamMutex.Lock()
-	defer s.iamMutex.Unlock()
-
-	if s.iam == nil {
-		s.iam = iam.NewFromConfig(s.configs[0])
-	}
-
-	return run(ctx, s.iam)
-}
-
 func resolveConfigs(ctx context.Context, regions []string) ([]aws.Config, error) {
 	if len(regions) == 1 && regions[0] == "all" {
 		return resolveAll(ctx)
