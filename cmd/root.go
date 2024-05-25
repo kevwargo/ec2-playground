@@ -39,8 +39,8 @@ func Execute() {
 	rootCmd.AddCommand(run.Command(&sess))
 	rootCmd.AddCommand(ls.Command(&sess))
 	rootCmd.AddCommand(exec.Command())
-	rootCmd.AddCommand(rm.Command())
-	rootCmd.AddCommand(start.Command())
+	rootCmd.AddCommand(rm.Command(&sess))
+	rootCmd.AddCommand(start.Command(&sess))
 	rootCmd.AddCommand(stop.Command(&sess))
 	rootCmd.AddCommand(ssh.Command())
 

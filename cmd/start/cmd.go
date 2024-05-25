@@ -1,16 +1,27 @@
 package start
 
 import (
-	"fmt"
+	"context"
 
+	"github.com/aws/aws-sdk-go-v2/service/ec2"
+	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	"github.com/spf13/cobra"
+
+	"kevwargo/ec2-playground/internal/session"
+	"kevwargo/ec2-playground/internal/vmstate"
 )
 
-func Command() *cobra.Command {
-	return &cobra.Command{
-		Use: "start",
-		Run: func(_ *cobra.Command, _ []string) {
-			fmt.Println("ec2:StartInstances")
+func Command(sess *session.Session) *cobra.Command {
+	return vmstate.BuildChangeCommand(
+		"start",
+		sess,
+		func(ctx context.Context, client *ec2.Client, ids []string) ([]types.InstanceStateChange, error) {
+			resp, err := client.StartInstances(ctx, &ec2.StartInstancesInput{InstanceIds: ids})
+			if err != nil {
+				return nil, err
+			}
+
+			return resp.StartingInstances, nil
 		},
-	}
+	)
 }
