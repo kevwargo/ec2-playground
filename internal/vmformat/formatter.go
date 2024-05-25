@@ -37,23 +37,8 @@ func New(region string, ec2Client *ec2.Client, ssmClient *ssm.Client, tmpl *temp
 }
 
 func (f Formatter) Format(ctx context.Context, instance types.Instance) (VM, error) {
-	tags := make(map[string]string, len(instance.Tags))
-	for _, tag := range instance.Tags {
-		tags[*tag.Key] = *tag.Value
-	}
-
 	var buf bytes.Buffer
-	err := f.tmpl.Execute(&buf, &instanceData{
-		Id:     *instance.InstanceId,
-		Type:   string(instance.InstanceType),
-		Name:   tags["Name"],
-		State:  string(instance.State.Name),
-		Region: f.region,
-		I:      instance,
-
-		ctx: ctx,
-		ssm: f.ssm,
-	})
+	err := f.tmpl.Execute(&buf, f.prepareInstanceData(ctx, instance))
 	if err != nil {
 		return VM{}, err
 	}

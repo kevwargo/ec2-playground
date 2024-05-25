@@ -2,6 +2,9 @@ package vmformat
 
 import (
 	"context"
+	"fmt"
+	"slices"
+	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
@@ -12,14 +15,56 @@ import (
 type instanceData struct {
 	Id     string
 	Type   string
-	Name   string
 	State  string
 	Region string
 	I      types.Instance
 
-	ctx     context.Context
+	ctx context.Context
+
+	tags map[string]string
+
 	ssm     *ssm.Client
 	ssmInfo *ssmtypes.InstanceInformation
+}
+
+func (f Formatter) prepareInstanceData(ctx context.Context, instance types.Instance) *instanceData {
+	return &instanceData{
+		Id:     *instance.InstanceId,
+		Type:   string(instance.InstanceType),
+		State:  string(instance.State.Name),
+		Region: f.region,
+		I:      instance,
+
+		ctx: ctx,
+		ssm: f.ssm,
+	}
+}
+
+func (i *instanceData) Name() string {
+	return i.Tags()["Name"]
+}
+
+type tags map[string]string
+
+func (t tags) String() string {
+	pairs := make([]string, 0, len(t))
+	for key, value := range t {
+		pairs = append(pairs, fmt.Sprintf("%s=%s", key, value))
+	}
+
+	slices.Sort(pairs)
+	return strings.Join(pairs, " ")
+}
+
+func (i *instanceData) Tags() tags {
+	if i.tags == nil {
+		i.tags = make(tags, len(i.I.Tags))
+		for _, t := range i.I.Tags {
+			i.tags[*t.Key] = *t.Value
+		}
+	}
+
+	return i.tags
 }
 
 func (i *instanceData) SSM() (*ssmtypes.InstanceInformation, error) {
