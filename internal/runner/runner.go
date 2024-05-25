@@ -12,10 +12,10 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 
 	"kevwargo/ec2-playground/internal/config"
-	"kevwargo/ec2-playground/internal/format"
 	"kevwargo/ec2-playground/internal/images"
 	"kevwargo/ec2-playground/internal/infra"
 	"kevwargo/ec2-playground/internal/session"
+	"kevwargo/ec2-playground/internal/vmformat"
 )
 
 type InstanceRunner struct {
@@ -23,7 +23,7 @@ type InstanceRunner struct {
 	ec2           *ec2.Client
 	sess          *session.Session
 	infraFetcher  infra.Fetcher
-	formatter     format.Formatter
+	formatter     vmformat.Formatter
 	imageResolver images.Resolver
 }
 
@@ -36,7 +36,7 @@ func New(awsCfg aws.Config, runCfg config.RunConfig, sess *session.Session) Inst
 		ec2:           ec2Client,
 		sess:          sess,
 		infraFetcher:  infra.NewFetcher(awsCfg, runCfg),
-		formatter:     format.New(awsCfg.Region, ec2Client, ssmClient, runCfg.DumpFormat.Template()),
+		formatter:     vmformat.New(awsCfg.Region, ec2Client, ssmClient, runCfg.DumpFormat.Template()),
 		imageResolver: images.NewResolver(ssmClient),
 	}
 }
@@ -74,9 +74,12 @@ func (r InstanceRunner) runInstances(ctx context.Context, input ec2.RunInstances
 	}
 
 	for _, instance := range resp.Instances {
-		if err := r.formatter.Print(ctx, instance); err != nil {
+		vm, err := r.formatter.Format(ctx, instance)
+		if err != nil {
 			return err
 		}
+
+		vmformat.Print(vm)
 	}
 
 	return nil

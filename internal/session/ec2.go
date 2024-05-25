@@ -5,56 +5,48 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"os"
 	"strconv"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
+
+	"kevwargo/ec2-playground/internal/vmformat"
 )
 
-type (
-	scanner func(context.Context, aws.Config) ([]types.Instance, error)
-	actor   func(context.Context, aws.Config, []types.Instance) error
-)
-
-type result struct {
-	index    int
-	instance types.Instance
-}
-
-func (s *Session) RunEC2(ctx context.Context, scan scanner, act actor) error {
+func (s *Session) RunEC2(
+	ctx context.Context,
+	scan func(context.Context, aws.Config) ([]vmformat.VM, error),
+	transform func(context.Context, aws.Config, []vmformat.VM) error,
+) error {
 	configs := make(map[string]aws.Config, len(s.configs))
 	for _, cfg := range s.configs {
 		configs[cfg.Region] = cfg
 	}
 
-	results, err := s.scanEC2(ctx, scan)
+	scanned, err := s.scanEC2(ctx, scan)
 	if err != nil {
 		return err
 	}
 
-	log.Printf("Scanned all %d", len(results))
-
-	selector, err := selectInstances(results)
+	selector, err := selectVMs(scanned)
 	if err != nil {
 		return err
 	}
 
 	errsC := make(chan error)
 	var jobsCount int
-	for region, batch := range results {
-		var instances []types.Instance
-		for _, result := range batch {
-			if selector.all || selector.indices[result.index] {
-				instances = append(instances, result.instance)
+	for region, vmGroup := range scanned {
+		var vms []vmformat.VM
+		for _, vm := range vmGroup {
+			if selector.all || selector.include[vm.index] {
+				vms = append(vms, vm.vm)
 			}
 		}
 
-		if len(instances) > 0 {
+		if len(vms) > 0 {
 			go func(config aws.Config) {
-				errsC <- act(ctx, config, instances)
+				errsC <- transform(ctx, config, vms)
 			}(configs[region])
 
 			jobsCount++
@@ -69,36 +61,44 @@ func (s *Session) RunEC2(ctx context.Context, scan scanner, act actor) error {
 	return errors.Join(errs...)
 }
 
-type scanResp struct {
-	region    string
-	instances []types.Instance
-	err       error
+type indexedVM struct {
+	index int
+	vm    vmformat.VM
 }
 
-func (s *Session) scanEC2(ctx context.Context, scan scanner) (map[string][]result, error) {
+type scanResp struct {
+	region string
+	vms    []vmformat.VM
+	err    error
+}
+
+func (s *Session) scanEC2(
+	ctx context.Context,
+	scan func(context.Context, aws.Config) ([]vmformat.VM, error),
+) (map[string][]indexedVM, error) {
 	respC := make(chan scanResp)
 	for _, cfg := range s.configs {
 		go func(cfg aws.Config) {
-			instances, err := scan(ctx, cfg)
+			vms, err := scan(ctx, cfg)
 			respC <- scanResp{
-				region:    cfg.Region,
-				instances: instances,
-				err:       err,
+				region: cfg.Region,
+				vms:    vms,
+				err:    err,
 			}
 		}(cfg)
 	}
 
 	index := 1
-	results := make(map[string][]result)
+	scanned := make(map[string][]indexedVM)
 	errs := make([]error, 0, len(s.configs))
 	for range s.configs {
 		resp := <-respC
 
 		errs = append(errs, resp.err)
-		for _, instance := range resp.instances {
-			results[resp.region] = append(results[resp.region], result{
-				index:    index,
-				instance: instance,
+		for _, vm := range resp.vms {
+			scanned[resp.region] = append(scanned[resp.region], indexedVM{
+				index: index,
+				vm:    vm,
 			})
 			index++
 		}
@@ -107,22 +107,22 @@ func (s *Session) scanEC2(ctx context.Context, scan scanner) (map[string][]resul
 		return nil, err
 	}
 
-	return results, nil
+	return scanned, nil
 }
 
 type selector struct {
 	all     bool
-	indices map[int]bool
+	include map[int]bool
 }
 
-func selectInstances(results map[string][]result) (selector, error) {
-	for region, batch := range results {
-		for _, result := range batch {
-			fmt.Printf("[%d] %s %s\n", result.index, region, formatInstance(result.instance))
+func selectVMs(vmGroups map[string][]indexedVM) (selector, error) {
+	for _, vmGroup := range vmGroups {
+		for _, vm := range vmGroup {
+			fmt.Printf("[%d] %s\n", vm.index, vm.vm)
 		}
 	}
 
-	fmt.Print("Select instances: ")
+	fmt.Print("Select VMs: ")
 	prompt := bufio.NewScanner(os.Stdin)
 	if ok := prompt.Scan(); !ok {
 		if err := prompt.Err(); err != nil {
@@ -134,11 +134,11 @@ func selectInstances(results map[string][]result) (selector, error) {
 
 	resp := prompt.Text()
 
-	if resp == "$ALL" {
+	if resp == "all" {
 		return selector{all: true}, nil
 	}
 
-	s := selector{indices: make(map[int]bool)}
+	s := selector{include: make(map[int]bool)}
 	for _, group := range strings.Split(resp, ",") {
 		include := true
 		if strings.HasPrefix(group, "!") {
@@ -152,7 +152,7 @@ func selectInstances(results map[string][]result) (selector, error) {
 		}
 
 		for i := beg; i <= end; i++ {
-			s.indices[i] = include
+			s.include[i] = include
 		}
 	}
 
@@ -182,20 +182,8 @@ func parseRange(raw string) (beg int, end int, err error) {
 	}
 
 	if beg > end {
-		return 0, 0, fmt.Errorf("%d > %d", beg, end)
+		return 0, 0, fmt.Errorf("invalid number range: %s: %d > %d", raw, beg, end)
 	}
 
 	return beg, end, nil
-}
-
-func formatInstance(instance types.Instance) string {
-	var name string
-	for _, tag := range instance.Tags {
-		if *tag.Key == "Name" {
-			name = *tag.Value
-			break
-		}
-	}
-
-	return fmt.Sprintf("%s %s %s", *instance.InstanceId, name, instance.State.Name)
 }

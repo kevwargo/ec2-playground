@@ -41,7 +41,7 @@ func Execute() {
 	rootCmd.AddCommand(exec.Command())
 	rootCmd.AddCommand(rm.Command())
 	rootCmd.AddCommand(start.Command())
-	rootCmd.AddCommand(stop.Command())
+	rootCmd.AddCommand(stop.Command(&sess))
 	rootCmd.AddCommand(ssh.Command())
 
 	if err := rootCmd.Execute(); err != nil {

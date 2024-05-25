@@ -1,10 +1,8 @@
-package format
+package vmformat
 
 import (
 	"bytes"
 	"context"
-	"log"
-	"os"
 	"text/template"
 
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
@@ -12,12 +10,21 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 )
 
+type VM struct {
+	types.Instance
+
+	format string
+}
+
+func (v VM) String() string {
+	return v.format
+}
+
 type Formatter struct {
 	region string
 	ec2    *ec2.Client
 	ssm    *ssm.Client
 	tmpl   *template.Template
-	p      *log.Logger
 }
 
 func New(region string, ec2Client *ec2.Client, ssmClient *ssm.Client, tmpl *template.Template) Formatter {
@@ -26,11 +33,10 @@ func New(region string, ec2Client *ec2.Client, ssmClient *ssm.Client, tmpl *temp
 		ec2:    ec2Client,
 		ssm:    ssmClient,
 		tmpl:   tmpl,
-		p:      log.New(os.Stdout, "", 0),
 	}
 }
 
-func (f Formatter) Format(ctx context.Context, instance types.Instance) (string, error) {
+func (f Formatter) Format(ctx context.Context, instance types.Instance) (VM, error) {
 	tags := make(map[string]string, len(instance.Tags))
 	for _, tag := range instance.Tags {
 		tags[*tag.Key] = *tag.Value
@@ -39,7 +45,9 @@ func (f Formatter) Format(ctx context.Context, instance types.Instance) (string,
 	var buf bytes.Buffer
 	err := f.tmpl.Execute(&buf, &instanceData{
 		Id:     *instance.InstanceId,
+		Type:   string(instance.InstanceType),
 		Name:   tags["Name"],
+		State:  string(instance.State.Name),
 		Region: f.region,
 		I:      instance,
 
@@ -47,19 +55,11 @@ func (f Formatter) Format(ctx context.Context, instance types.Instance) (string,
 		ssm: f.ssm,
 	})
 	if err != nil {
-		return "", err
+		return VM{}, err
 	}
 
-	return buf.String(), nil
-}
-
-func (f Formatter) Print(ctx context.Context, instance types.Instance) error {
-	formatted, err := f.Format(ctx, instance)
-	if err != nil {
-		return err
-	}
-
-	f.p.Println(formatted)
-
-	return nil
+	return VM{
+		Instance: instance,
+		format:   buf.String(),
+	}, nil
 }

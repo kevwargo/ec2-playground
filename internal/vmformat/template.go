@@ -1,4 +1,4 @@
-package format
+package vmformat
 
 import (
 	"context"
@@ -11,7 +11,9 @@ import (
 
 type instanceData struct {
 	Id     string
+	Type   string
 	Name   string
+	State  string
 	Region string
 	I      types.Instance
 

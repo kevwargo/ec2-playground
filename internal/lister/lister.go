@@ -12,31 +12,33 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/aws/smithy-go"
 
-	"kevwargo/ec2-playground/internal/format"
+	"kevwargo/ec2-playground/internal/vmformat"
 )
 
-type InstanceLister struct {
+type VMLister struct {
 	ec2Client *ec2.Client
-	formatter format.Formatter
+	formatter vmformat.Formatter
 }
 
-func New(cfg aws.Config, formatTemplate *template.Template) InstanceLister {
+func New(cfg aws.Config, formatTemplate *template.Template) VMLister {
 	ec2Client := ec2.NewFromConfig(cfg)
 	ssmClient := ssm.NewFromConfig(cfg)
-	formatter := format.New(cfg.Region, ec2Client, ssmClient, formatTemplate)
+	formatter := vmformat.New(cfg.Region, ec2Client, ssmClient, formatTemplate)
 
-	return InstanceLister{
+	return VMLister{
 		ec2Client: ec2Client,
 		formatter: formatter,
 	}
 }
 
-func (l InstanceLister) ListInstances(ctx context.Context) error {
+func (l VMLister) ListVMs(ctx context.Context) ([]vmformat.VM, error) {
+	var vms []vmformat.VM
 	paginator := ec2.NewDescribeInstancesPaginator(l.ec2Client, &ec2.DescribeInstancesInput{})
+
 	for paginator.HasMorePages() {
 		page, err := paginator.NextPage(ctx)
 		if err != nil {
-			return ignoreErrorCodes(err, "UnauthorizedOperation", "AuthFailure")
+			return nil, ignoreErrorCodes(err, "UnauthorizedOperation", "AuthFailure")
 		}
 
 		for _, reservation := range page.Reservations {
@@ -45,14 +47,17 @@ func (l InstanceLister) ListInstances(ctx context.Context) error {
 					continue
 				}
 
-				if err := l.formatter.Print(ctx, instance); err != nil {
-					return err
+				vm, err := l.formatter.Format(ctx, instance)
+				if err != nil {
+					return nil, err
 				}
+
+				vms = append(vms, vm)
 			}
 		}
 	}
 
-	return nil
+	return vms, nil
 }
 
 func ignoreErrorCodes(err error, codes ...string) error {
