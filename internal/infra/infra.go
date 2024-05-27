@@ -6,8 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
-	"os"
 	"regexp"
 
 	"github.com/aws/aws-sdk-go-v2/service/cloudformation"
@@ -43,18 +41,16 @@ type Resources struct {
 }
 
 type Fetcher struct {
-	cfn        *cloudformation.Client
+	session    *session.Regional
 	stackName  string
 	skipDeploy bool
-	log        *log.Logger
 }
 
 func NewFetcher(sess *session.Regional, cfg config.RunConfig) Fetcher {
 	return Fetcher{
-		cfn:        sess.CFN(),
+		session:    sess,
 		stackName:  cfg.InfraStackName,
 		skipDeploy: cfg.SkipInfraDeploy,
-		log:        log.New(os.Stderr, fmt.Sprintf("%s: ", sess.Region), log.LstdFlags),
 	}
 }
 
@@ -65,7 +61,7 @@ func (f Fetcher) Fetch(ctx context.Context) (Resources, error) {
 		}
 	}
 
-	resp, err := f.cfn.DescribeStacks(ctx, &cloudformation.DescribeStacksInput{
+	resp, err := f.session.CFN().DescribeStacks(ctx, &cloudformation.DescribeStacksInput{
 		StackName: &f.stackName,
 	})
 	if err != nil {
@@ -116,14 +112,14 @@ func (f Fetcher) deploy(ctx context.Context) error {
 }
 
 func (f Fetcher) tryStartUpdate(ctx context.Context) (string, error) {
-	resp, err := f.cfn.UpdateStack(ctx, &cloudformation.UpdateStackInput{
+	resp, err := f.session.CFN().UpdateStack(ctx, &cloudformation.UpdateStackInput{
 		StackName:    &f.stackName,
 		Capabilities: []types.Capability{types.CapabilityCapabilityIam},
 		TemplateBody: &templateBody,
 	})
 
 	if err == nil {
-		f.log.Printf("Updating stack %q", *resp.StackId)
+		f.session.Log("Updating stack %q", *resp.StackId)
 		return *resp.StackId, nil
 	}
 
@@ -143,12 +139,12 @@ func (f Fetcher) handleValidationError(ctx context.Context, err error) (string, 
 	}
 
 	if msg == noUpdates.Error() {
-		f.log.Printf("Stack %q is up-to-date", f.stackName)
+		f.session.Log("Stack %q is up-to-date", f.stackName)
 		return "", noUpdates
 	}
 
 	if errMsgStackNonExistent.MatchString(msg) {
-		f.log.Printf("Stack %q does not exist, creating", f.stackName)
+		f.session.Log("Stack %q does not exist, creating", f.stackName)
 		return "", nil
 	}
 
@@ -156,7 +152,7 @@ func (f Fetcher) handleValidationError(ctx context.Context, err error) (string, 
 		stackID, stackStatus := m[1], m[2]
 
 		if inProgress(stackStatus) {
-			f.log.Printf("Stack %q is %s, waiting for completion", f.stackName, stackStatus)
+			f.session.Log("Stack %q is %s, waiting for completion", f.stackName, stackStatus)
 			return stackID, nil
 		}
 
@@ -169,9 +165,9 @@ func (f Fetcher) handleValidationError(ctx context.Context, err error) (string, 
 }
 
 func (f Fetcher) deleteRolledBack(ctx context.Context, stackID string) error {
-	f.log.Printf("Deleting rolled back %q", stackID)
+	f.session.Log("Deleting rolled back %q", stackID)
 
-	_, err := f.cfn.DeleteStack(ctx, &cloudformation.DeleteStackInput{
+	_, err := f.session.CFN().DeleteStack(ctx, &cloudformation.DeleteStackInput{
 		StackName: &stackID,
 	})
 	if err != nil {
@@ -182,7 +178,7 @@ func (f Fetcher) deleteRolledBack(ctx context.Context, stackID string) error {
 }
 
 func (f Fetcher) startCreate(ctx context.Context) (string, error) {
-	resp, err := f.cfn.CreateStack(ctx, &cloudformation.CreateStackInput{
+	resp, err := f.session.CFN().CreateStack(ctx, &cloudformation.CreateStackInput{
 		StackName:    &f.stackName,
 		Capabilities: []types.Capability{types.CapabilityCapabilityIam},
 		TemplateBody: &templateBody,
@@ -191,6 +187,6 @@ func (f Fetcher) startCreate(ctx context.Context) (string, error) {
 		return "", err
 	}
 
-	f.log.Printf("Creating stack %q", *resp.StackId)
+	f.session.Log("Creating stack %q", *resp.StackId)
 	return *resp.StackId, nil
 }

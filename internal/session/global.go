@@ -16,9 +16,9 @@ type Global struct {
 
 	regional        map[string]*Regional
 	defaultRegional *Regional
-
-	iam      *iam.Client
-	iamMutex sync.Mutex
+	iam             *iam.Client
+	iamMutex        sync.Mutex
+	logMutex        sync.Mutex
 }
 
 func (c *Global) init(ctx context.Context) error {

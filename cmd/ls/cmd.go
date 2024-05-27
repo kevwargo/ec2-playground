@@ -8,7 +8,6 @@ import (
 	"kevwargo/ec2-playground/internal/config"
 	"kevwargo/ec2-playground/internal/lister"
 	"kevwargo/ec2-playground/internal/session"
-	"kevwargo/ec2-playground/internal/vmformat"
 )
 
 func Command(sess *session.Global) *cobra.Command {
@@ -28,7 +27,7 @@ func Command(sess *session.Global) *cobra.Command {
 				}
 
 				for _, vm := range vms {
-					vmformat.Print(vm)
+					sess.Print(vm.String())
 				}
 
 				return nil

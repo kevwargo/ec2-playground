@@ -5,7 +5,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"os"
 	"strconv"
 	"strings"
@@ -79,7 +78,7 @@ func changeState(ctx context.Context, in changeStateInput) error {
 		}
 
 		for _, change := range changes {
-			log.Printf("%s: %s: %s -> %s", s.Region, *change.InstanceId, change.PreviousState.Name, change.CurrentState.Name)
+			s.Log("%s: %s -> %s", *change.InstanceId, change.PreviousState.Name, change.CurrentState.Name)
 		}
 
 		return nil

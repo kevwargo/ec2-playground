@@ -7,7 +7,6 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"log"
 	"os"
 	"os/exec"
 	"strings"
@@ -60,7 +59,7 @@ func (r InstanceRunner) deployKey(ctx context.Context, key sshKey) error {
 
 	if describeResp != nil && len(describeResp.KeyPairs) > 0 {
 		k := describeResp.KeyPairs[0]
-		log.Printf("Key %s(%s %s) exists", *k.KeyName, *k.KeyPairId, *k.KeyFingerprint)
+		r.sess.Log("Key %s(%s %s) exists", *k.KeyName, *k.KeyPairId, *k.KeyFingerprint)
 		return nil
 	}
 
@@ -72,7 +71,7 @@ func (r InstanceRunner) deployKey(ctx context.Context, key sshKey) error {
 		return err
 	}
 
-	log.Printf("Imported new key: %s(%s %s)", *importResp.KeyName, *importResp.KeyPairId, *importResp.KeyFingerprint)
+	r.sess.Log("Imported new key: %s(%s %s)", *importResp.KeyName, *importResp.KeyPairId, *importResp.KeyFingerprint)
 
 	return nil
 }
@@ -98,7 +97,7 @@ func (r InstanceRunner) readSSHKey(keyFile string) (sshKey, error) {
 	for _, b := range fp {
 		hex = append(hex, fmt.Sprintf("%02x", b))
 	}
-	log.Printf("%s HEX fingerprint: %s", keyFile, strings.Join(hex, ":"))
+	r.sess.Log("%s HEX fingerprint: %s", keyFile, strings.Join(hex, ":"))
 
 	data, err := os.ReadFile(keyFile)
 	if err != nil {

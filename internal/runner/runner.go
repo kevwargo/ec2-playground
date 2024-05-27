@@ -73,7 +73,7 @@ func (r InstanceRunner) runInstances(ctx context.Context, input ec2.RunInstances
 			return err
 		}
 
-		vmformat.Print(vm)
+		r.sess.Print(vm.String())
 	}
 
 	return nil

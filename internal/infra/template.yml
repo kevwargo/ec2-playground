@@ -24,6 +24,8 @@ Resources:
       Tags:
         - Key: Name
           Value: ec2-playground
+        - Key: props
+          Value: undefined
 
   IGW:
     Condition: CreateVPC

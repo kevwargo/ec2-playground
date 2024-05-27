@@ -3,13 +3,14 @@ package infra
 import (
 	"context"
 	"fmt"
-	"log"
 	"slices"
 	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/service/cloudformation"
 	"github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
+
+	"kevwargo/ec2-playground/internal/session"
 )
 
 const (
@@ -19,19 +20,17 @@ const (
 )
 
 type statusWaiter struct {
-	cfn             *cloudformation.Client
+	session         *session.Regional
 	stackID         string
 	lastEventID     string
 	desiredStatuses []types.StackStatus
-	log             *log.Logger
 }
 
 func (f Fetcher) wait(ctx context.Context, stackID string, statuses ...types.StackStatus) error {
 	w := statusWaiter{
-		cfn:             f.cfn,
+		session:         f.session,
 		stackID:         stackID,
 		desiredStatuses: statuses,
-		log:             f.log,
 	}
 
 	return w.wait(ctx)
@@ -70,7 +69,7 @@ func (w *statusWaiter) wait(ctx context.Context) error {
 }
 
 func (w *statusWaiter) getStatus(ctx context.Context) (types.StackStatus, error) {
-	resp, err := w.cfn.DescribeStacks(ctx, &cloudformation.DescribeStacksInput{
+	resp, err := w.session.CFN().DescribeStacks(ctx, &cloudformation.DescribeStacksInput{
 		StackName: &w.stackID,
 	})
 	if err != nil {
@@ -95,14 +94,14 @@ func (w *statusWaiter) logEvents(ctx context.Context) error {
 	for i := len(events) - 1; i >= 0; i-- {
 		e := events[i]
 		timestamp := e.Timestamp.Format(time.RFC3339)
-		w.log.Printf("%s: [%s] %s | %s", timestamp, e.ResourceStatus, *e.ResourceType, *e.LogicalResourceId)
+		w.session.Log("%s: [%s] %s | %s", timestamp, e.ResourceStatus, *e.ResourceType, *e.LogicalResourceId)
 	}
 
 	return nil
 }
 
 func (w *statusWaiter) listNewEvents(ctx context.Context) ([]types.StackEvent, error) {
-	paginator := cloudformation.NewDescribeStackEventsPaginator(w.cfn, &cloudformation.DescribeStackEventsInput{
+	paginator := cloudformation.NewDescribeStackEventsPaginator(w.session.CFN(), &cloudformation.DescribeStackEventsInput{
 		StackName: &w.stackID,
 	})
 	var events []types.StackEvent

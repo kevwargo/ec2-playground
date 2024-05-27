@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
@@ -16,6 +15,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/iam/types"
 
 	"kevwargo/ec2-playground/internal/infra"
+	"kevwargo/ec2-playground/internal/session"
 )
 
 func (r InstanceRunner) setProfile(ctx context.Context, in *ec2.RunInstancesInput, resources infra.Resources) error {
@@ -26,6 +26,7 @@ func (r InstanceRunner) setProfile(ctx context.Context, in *ec2.RunInstancesInpu
 	} else if r.cfg.Policy != "" {
 		err := r.sess.Global.RunIAM(ctx, func(ctx context.Context, iamClient *iam.Client) error {
 			builder := profileBuilder{
+				session:       r.sess.Global,
 				iam:           iamClient,
 				userPolicy:    r.cfg.Policy,
 				defaultPolicy: resources.InstancePolicy,
@@ -54,6 +55,7 @@ func (r InstanceRunner) setProfile(ctx context.Context, in *ec2.RunInstancesInpu
 }
 
 type profileBuilder struct {
+	session       *session.Global
 	iam           *iam.Client
 	userPolicy    string
 	defaultPolicy string
@@ -66,7 +68,7 @@ func (b *profileBuilder) buildProfile(ctx context.Context) (string, error) {
 		return "", err
 	}
 
-	log.Printf("hash(%s) = %s", b.userPolicy, policyHash)
+	b.session.Log("hash(%s) = %s", b.userPolicy, policyHash)
 
 	profileName := fmt.Sprintf(instanceProfileFmt, b.infraName, policyHash)
 	if exists, err := b.profileExists(ctx, profileName); exists {
@@ -140,7 +142,7 @@ func (b *profileBuilder) createRole(ctx context.Context, policyHash string) (str
 	if err != nil {
 		return "", err
 	}
-	log.Printf("Role %s created", roleName)
+	b.session.Log("Role %s created", roleName)
 
 	if err := b.attachPolicy(ctx, b.userPolicy, roleName); err != nil {
 		return "", err
@@ -151,7 +153,7 @@ func (b *profileBuilder) createRole(ctx context.Context, policyHash string) (str
 	if err := b.attachPolicy(ctx, ssmPolicy, roleName); err != nil {
 		return "", err
 	}
-	log.Printf("Attached policies to %s", roleName)
+	b.session.Log("Attached policies to %s", roleName)
 
 	return roleName, nil
 }
@@ -171,7 +173,7 @@ func (b *profileBuilder) createProfile(ctx context.Context, profileName, roleNam
 	if err != nil {
 		return err
 	}
-	log.Printf("Profile %s created", profileName)
+	b.session.Log("Profile %s created", profileName)
 
 	_, err = b.iam.AddRoleToInstanceProfile(ctx, &iam.AddRoleToInstanceProfileInput{
 		InstanceProfileName: &profileName,
@@ -180,7 +182,7 @@ func (b *profileBuilder) createProfile(ctx context.Context, profileName, roleNam
 	if err != nil {
 		return err
 	}
-	log.Printf("Role %s added to profile %s", roleName, profileName)
+	b.session.Log("Role %s added to profile %s", roleName, profileName)
 
 	return nil
 }
