@@ -10,12 +10,12 @@ import (
 	"os"
 	"regexp"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/cloudformation"
 	"github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
 	"github.com/aws/smithy-go"
 
 	"kevwargo/ec2-playground/internal/config"
+	"kevwargo/ec2-playground/internal/session"
 )
 
 //go:embed template.yml
@@ -49,12 +49,12 @@ type Fetcher struct {
 	log        *log.Logger
 }
 
-func NewFetcher(awsCfg aws.Config, runCfg config.RunConfig) Fetcher {
+func NewFetcher(sess *session.Regional, cfg config.RunConfig) Fetcher {
 	return Fetcher{
-		cfn:        cloudformation.NewFromConfig(awsCfg),
-		stackName:  runCfg.InfraStackName,
-		skipDeploy: runCfg.SkipInfraDeploy,
-		log:        log.New(os.Stderr, fmt.Sprintf("%s: ", awsCfg.Region), log.LstdFlags),
+		cfn:        sess.CFN(),
+		stackName:  cfg.InfraStackName,
+		skipDeploy: cfg.SkipInfraDeploy,
+		log:        log.New(os.Stderr, fmt.Sprintf("%s: ", sess.Region), log.LstdFlags),
 	}
 }
 

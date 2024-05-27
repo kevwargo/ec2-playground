@@ -6,13 +6,17 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/iam"
 )
 
-func (s *Session) RunIAM(ctx context.Context, run func(context.Context, *iam.Client) error) error {
-	s.iamMutex.Lock()
-	defer s.iamMutex.Unlock()
-
-	if s.iam == nil {
-		s.iam = iam.NewFromConfig(s.configs[0])
+func (g *Global) RunIAM(ctx context.Context, run func(context.Context, *iam.Client) error) error {
+	if err := g.init(ctx); err != nil {
+		return err
 	}
 
-	return run(ctx, s.iam)
+	g.iamMutex.Lock()
+	defer g.iamMutex.Unlock()
+
+	if g.iam == nil {
+		g.iam = iam.NewFromConfig(g.defaultRegional.cfg)
+	}
+
+	return run(ctx, g.iam)
 }

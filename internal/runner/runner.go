@@ -9,7 +9,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
-	"github.com/aws/aws-sdk-go-v2/service/ssm"
 
 	"kevwargo/ec2-playground/internal/config"
 	"kevwargo/ec2-playground/internal/images"
@@ -20,24 +19,19 @@ import (
 
 type InstanceRunner struct {
 	cfg           config.RunConfig
-	ec2           *ec2.Client
-	sess          *session.Session
+	sess          *session.Regional
 	infraFetcher  infra.Fetcher
 	formatter     vmformat.Formatter
 	imageResolver images.Resolver
 }
 
-func New(awsCfg aws.Config, runCfg config.RunConfig, sess *session.Session) InstanceRunner {
-	ec2Client := ec2.NewFromConfig(awsCfg)
-	ssmClient := ssm.NewFromConfig(awsCfg)
-
+func New(cfg config.RunConfig, sess *session.Regional) InstanceRunner {
 	return InstanceRunner{
-		cfg:           runCfg,
-		ec2:           ec2Client,
+		cfg:           cfg,
 		sess:          sess,
-		infraFetcher:  infra.NewFetcher(awsCfg, runCfg),
-		formatter:     vmformat.New(awsCfg.Region, ec2Client, ssmClient, runCfg.DumpFormat.Template()),
-		imageResolver: images.NewResolver(ssmClient),
+		infraFetcher:  infra.NewFetcher(sess, cfg),
+		formatter:     vmformat.New(sess, cfg.DumpFormat.Template()),
+		imageResolver: images.NewResolver(sess.SSM()),
 	}
 }
 
@@ -68,7 +62,7 @@ func (r InstanceRunner) RunInstances(ctx context.Context) error {
 }
 
 func (r InstanceRunner) runInstances(ctx context.Context, input ec2.RunInstancesInput) error {
-	resp, err := r.ec2.RunInstances(ctx, &input)
+	resp, err := r.sess.EC2().RunInstances(ctx, &input)
 	if err != nil {
 		return err
 	}

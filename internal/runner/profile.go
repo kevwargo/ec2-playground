@@ -24,7 +24,7 @@ func (r InstanceRunner) setProfile(ctx context.Context, in *ec2.RunInstancesInpu
 	if r.cfg.Profile != "" {
 		profile = r.cfg.Profile
 	} else if r.cfg.Policy != "" {
-		err := r.sess.RunIAM(ctx, func(ctx context.Context, iamClient *iam.Client) error {
+		err := r.sess.Global.RunIAM(ctx, func(ctx context.Context, iamClient *iam.Client) error {
 			builder := profileBuilder{
 				iam:           iamClient,
 				userPolicy:    r.cfg.Policy,

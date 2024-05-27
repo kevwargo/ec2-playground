@@ -32,11 +32,11 @@ func (f Formatter) prepareInstanceData(ctx context.Context, instance types.Insta
 		Id:     *instance.InstanceId,
 		Type:   string(instance.InstanceType),
 		State:  string(instance.State.Name),
-		Region: f.region,
+		Region: f.session.Region,
 		I:      instance,
 
 		ctx: ctx,
-		ssm: f.ssm,
+		ssm: f.session.SSM(),
 	}
 }
 

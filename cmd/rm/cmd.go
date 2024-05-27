@@ -11,7 +11,7 @@ import (
 	"kevwargo/ec2-playground/internal/vmstate"
 )
 
-func Command(sess *session.Session) *cobra.Command {
+func Command(sess *session.Global) *cobra.Command {
 	return vmstate.BuildChangeCommand(
 		"rm",
 		sess,

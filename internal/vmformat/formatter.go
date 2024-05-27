@@ -5,9 +5,9 @@ import (
 	"context"
 	"text/template"
 
-	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
-	"github.com/aws/aws-sdk-go-v2/service/ssm"
+
+	"kevwargo/ec2-playground/internal/session"
 )
 
 type VM struct {
@@ -21,18 +21,14 @@ func (v VM) String() string {
 }
 
 type Formatter struct {
-	region string
-	ec2    *ec2.Client
-	ssm    *ssm.Client
-	tmpl   *template.Template
+	session *session.Regional
+	tmpl    *template.Template
 }
 
-func New(region string, ec2Client *ec2.Client, ssmClient *ssm.Client, tmpl *template.Template) Formatter {
+func New(sess *session.Regional, tmpl *template.Template) Formatter {
 	return Formatter{
-		region: region,
-		ec2:    ec2Client,
-		ssm:    ssmClient,
-		tmpl:   tmpl,
+		session: sess,
+		tmpl:    tmpl,
 	}
 }
 

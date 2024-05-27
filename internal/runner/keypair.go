@@ -49,7 +49,7 @@ func (r InstanceRunner) setPublicSSHKey(ctx context.Context, keyFile string, in 
 }
 
 func (r InstanceRunner) deployKey(ctx context.Context, key sshKey) error {
-	describeResp, err := r.ec2.DescribeKeyPairs(ctx, &ec2.DescribeKeyPairsInput{
+	describeResp, err := r.sess.EC2().DescribeKeyPairs(ctx, &ec2.DescribeKeyPairsInput{
 		KeyNames: []string{key.name},
 	})
 	if err != nil {
@@ -64,7 +64,7 @@ func (r InstanceRunner) deployKey(ctx context.Context, key sshKey) error {
 		return nil
 	}
 
-	importResp, err := r.ec2.ImportKeyPair(ctx, &ec2.ImportKeyPairInput{
+	importResp, err := r.sess.EC2().ImportKeyPair(ctx, &ec2.ImportKeyPairInput{
 		KeyName:           &key.name,
 		PublicKeyMaterial: key.data,
 	})

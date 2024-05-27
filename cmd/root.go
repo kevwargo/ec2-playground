@@ -16,25 +16,15 @@ import (
 )
 
 func Execute() {
-	var cfg session.Config
-	var sess session.Session
+	var sess session.Global
 
 	rootCmd := &cobra.Command{
 		Use:           "ec2",
 		SilenceErrors: true,
 		SilenceUsage:  true,
-		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
-			s, err := session.New(cmd.Context(), &cfg)
-			if err != nil {
-				return err
-			}
-
-			sess = s
-			return nil
-		},
 	}
 
-	rootCmd.PersistentFlags().StringSliceVarP(&cfg.Regions, "regions", "r", nil, "List of regions, comma-separated")
+	rootCmd.PersistentFlags().StringSliceVarP(&sess.Regions, "regions", "r", nil, "List of regions, comma-separated")
 
 	rootCmd.AddCommand(run.Command(&sess))
 	rootCmd.AddCommand(ls.Command(&sess))
