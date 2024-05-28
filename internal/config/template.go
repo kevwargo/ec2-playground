@@ -10,7 +10,7 @@ type VMFormat struct {
 }
 
 func (t *VMFormat) String() string {
-	return defaultFormat
+	return t.Template().Root.String()
 }
 
 func (t *VMFormat) Type() string {
