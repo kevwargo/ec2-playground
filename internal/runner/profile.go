@@ -18,13 +18,13 @@ import (
 	"kevwargo/ec2-playground/internal/session"
 )
 
-func (r InstanceRunner) setProfile(ctx context.Context, in *ec2.RunInstancesInput, resources infra.Resources) error {
+func (r InstanceRunner) setProfile(ctx context.Context, in *ec2.RunInstancesInput, resources infra.Resources) (wait bool, err error) {
 	var profile string
 
 	if r.cfg.Profile != "" {
 		profile = r.cfg.Profile
 	} else if r.cfg.Policy != "" {
-		err := r.sess.Global.RunIAM(ctx, func(ctx context.Context, iamClient *iam.Client) error {
+		err = r.sess.Global.RunIAM(ctx, func(ctx context.Context, iamClient *iam.Client) error {
 			builder := profileBuilder{
 				session:       r.sess.Global,
 				iam:           iamClient,
@@ -41,8 +41,9 @@ func (r InstanceRunner) setProfile(ctx context.Context, in *ec2.RunInstancesInpu
 			return err
 		})
 		if err != nil {
-			return err
+			return false, err
 		}
+		wait = true
 	} else {
 		profile = resources.InstanceProfile
 	}
@@ -51,7 +52,7 @@ func (r InstanceRunner) setProfile(ctx context.Context, in *ec2.RunInstancesInpu
 		Name: &profile,
 	}
 
-	return nil
+	return wait, nil
 }
 
 type profileBuilder struct {

@@ -5,10 +5,12 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
+	"github.com/aws/smithy-go"
 
 	"kevwargo/ec2-playground/internal/config"
 	"kevwargo/ec2-playground/internal/images"
@@ -41,19 +43,19 @@ func (r InstanceRunner) RunInstances(ctx context.Context) error {
 		return err
 	}
 
-	inputs, err := r.buildInputs(ctx, resources)
+	params, err := r.buildParams(ctx, resources)
 	if err != nil {
 		return err
 	}
 
 	errC := make(chan error)
-	for _, input := range inputs {
+	for _, input := range params.inputs {
 		go func(in ec2.RunInstancesInput) {
-			errC <- r.runInstances(ctx, in)
+			errC <- r.runInstances(ctx, in, params.waitForProfile)
 		}(input)
 	}
 
-	errs := make([]error, len(inputs))
+	errs := make([]error, len(params.inputs))
 	for idx := range errs {
 		errs[idx] = <-errC
 	}
@@ -61,8 +63,31 @@ func (r InstanceRunner) RunInstances(ctx context.Context) error {
 	return errors.Join(errs...)
 }
 
-func (r InstanceRunner) runInstances(ctx context.Context, input ec2.RunInstancesInput) error {
+type runParams struct {
+	inputs         []ec2.RunInstancesInput
+	waitForProfile bool
+}
+
+func (r InstanceRunner) runInstances(ctx context.Context, input ec2.RunInstancesInput, waitForProfile bool) error {
 	resp, err := r.sess.EC2().RunInstances(ctx, &input)
+
+	for waitForProfile && err != nil {
+		var ae smithy.APIError
+		if !errors.As(err, &ae) {
+			return err
+		}
+
+		if ae.ErrorCode() != errProfileInvalidCode ||
+			ae.ErrorMessage() != fmt.Sprintf(errProfileInvalidMsgTmpl, *input.IamInstanceProfile.Name) {
+			return err
+		}
+
+		r.sess.Log("%s waiting for profile %s", *input.ImageId, *input.IamInstanceProfile.Name)
+		time.Sleep(time.Second)
+
+		resp, err = r.sess.EC2().RunInstances(ctx, &input)
+	}
+
 	if err != nil {
 		return err
 	}
@@ -79,33 +104,37 @@ func (r InstanceRunner) runInstances(ctx context.Context, input ec2.RunInstances
 	return nil
 }
 
-func (r InstanceRunner) buildInputs(ctx context.Context, resources infra.Resources) ([]ec2.RunInstancesInput, error) {
+func (r InstanceRunner) buildParams(ctx context.Context, resources infra.Resources) (runParams, error) {
 	in := r.createBasicInput(resources)
 
 	if err := r.setTags(&in); err != nil {
-		return nil, err
+		return runParams{}, err
 	}
 
-	if err := r.setProfile(ctx, &in, resources); err != nil {
-		return nil, err
+	waitForProfile, err := r.setProfile(ctx, &in, resources)
+	if err != nil {
+		return runParams{}, err
 	}
 
 	if err := r.setKeyPair(ctx, &in); err != nil {
-		return nil, err
+		return runParams{}, err
 	}
 
 	var inputs []ec2.RunInstancesInput
 	for _, image := range r.cfg.Images {
 		imageId, err := r.imageResolver.Resolve(ctx, image)
 		if err != nil {
-			return nil, err
+			return runParams{}, err
 		}
 
 		in.ImageId = &imageId
 		inputs = append(inputs, in)
 	}
 
-	return inputs, nil
+	return runParams{
+		inputs:         inputs,
+		waitForProfile: waitForProfile,
+	}, nil
 }
 
 func (r InstanceRunner) createBasicInput(resources infra.Resources) ec2.RunInstancesInput {
@@ -169,3 +198,8 @@ func (r InstanceRunner) setTags(in *ec2.RunInstancesInput) error {
 
 	return nil
 }
+
+const (
+	errProfileInvalidMsgTmpl = "Value (%s) for parameter iamInstanceProfile.name is invalid. Invalid IAM Instance Profile name"
+	errProfileInvalidCode    = "InvalidParameterValue"
+)
