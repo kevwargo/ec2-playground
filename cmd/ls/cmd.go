@@ -14,7 +14,8 @@ func Command(sess *session.Global) *cobra.Command {
 	var dumpFormat config.VMFormat
 
 	cmd := &cobra.Command{
-		Use: "ls",
+		Use:   "ls",
+		Short: "List existing EC2 instances",
 		RunE: func(c *cobra.Command, _ []string) error {
 			tmpl := dumpFormat.Template()
 

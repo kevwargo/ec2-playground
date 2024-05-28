@@ -21,22 +21,19 @@ import (
 	"kevwargo/ec2-playground/internal/vmformat"
 )
 
-func BuildChangeCommand(
-	name string,
+func SetupCommand(
+	cmd *cobra.Command,
 	sess *session.Global,
 	op func(context.Context, *ec2.Client, []string) ([]types.InstanceStateChange, error),
 ) *cobra.Command {
 	var dumpFormat config.VMFormat
 
-	cmd := &cobra.Command{
-		Use: name,
-		RunE: func(c *cobra.Command, _ []string) error {
-			return changeState(c.Context(), changeStateInput{
-				session: sess,
-				op:      op,
-				tmpl:    dumpFormat.Template(),
-			})
-		},
+	cmd.RunE = func(c *cobra.Command, _ []string) error {
+		return changeState(c.Context(), changeStateInput{
+			session: sess,
+			op:      op,
+			tmpl:    dumpFormat.Template(),
+		})
 	}
 
 	cmd.Flags().VarP(&dumpFormat, "format", "f", "Instance format")

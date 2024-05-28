@@ -16,6 +16,7 @@ func Command(sess *session.Global) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:           "run image1 [image2...]",
+		Short:         "Run new EC2 instances",
 		SilenceErrors: true,
 		SilenceUsage:  true,
 		Args:          cobra.MinimumNArgs(1),
