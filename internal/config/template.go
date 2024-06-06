@@ -1,16 +1,26 @@
 package config
 
 import (
-	"log"
+	"fmt"
+	"regexp"
+	"strings"
 	"text/template"
 )
 
 type VMFormat struct {
-	tmpl *template.Template
+	value *string
+	tmpl  *template.Template
 }
 
 func (t *VMFormat) String() string {
-	return t.Template().Root.String()
+	if t.value != nil {
+		return *t.value
+	}
+	if t.tmpl != nil {
+		return t.tmpl.Root.String()
+	}
+
+	return strings.Join(defaultFields, ",")
 }
 
 func (t *VMFormat) Type() string {
@@ -18,11 +28,30 @@ func (t *VMFormat) Type() string {
 }
 
 func (t *VMFormat) Set(raw string) error {
-	tmpl, err := template.New("param").Parse(raw)
+	var (
+		value string
+		tmpl  *template.Template
+		err   error
+	)
+
+	if m := regexFields.FindStringSubmatch(raw); m != nil {
+		fields := strings.Split(m[2], ",")
+		if m[1] == "+" {
+			fields = append(defaultFields, fields...)
+		}
+
+		value = strings.Join(fields, ",")
+		tmpl, err = buildFieldsTemplate(fields)
+	} else {
+		value = raw
+		tmpl, err = template.New("param").Parse(raw)
+	}
+
 	if err != nil {
 		return err
 	}
 
+	t.value = &value
 	t.tmpl = tmpl
 
 	return nil
@@ -36,15 +65,49 @@ func (t *VMFormat) Template() *template.Template {
 	return defaultTemplate
 }
 
-const defaultFormat = "{{.Region}} {{.Id}} {{.Name}} {{.State}}"
+func buildFieldsTemplate(fields []string) (*template.Template, error) {
+	templateFields := make([]string, 0, len(fields))
 
-var defaultTemplate *template.Template
-
-func init() {
-	t, err := template.New("default").Parse(defaultFormat)
-	if err != nil {
-		log.Fatalf("error in default format template: %s", err.Error())
+	for _, field := range fields {
+		if resolved, exists := fieldAliases[field]; !exists {
+			return nil, fmt.Errorf("format field %q is invalid (%v)", field, fields)
+		} else {
+			templateFields = append(templateFields, fmt.Sprintf("{{.%s}}", resolved))
+		}
 	}
 
-	defaultTemplate = t
+	return template.New("fields").Parse(strings.Join(templateFields, " "))
 }
+
+var (
+	defaultFields = []string{
+		fieldRegion,
+		fieldId,
+		fieldName,
+		fieldState,
+	}
+	defaultTemplate = template.Must(buildFieldsTemplate(defaultFields))
+
+	regexFields  = regexp.MustCompile(`^(\+?)([a-z-]+(,[a-z-]+)*)$`)
+	fieldAliases = map[string]string{
+		fieldRegion: "Region",
+		fieldId:     "Id",
+		fieldName:   "Name",
+		fieldState:  "State",
+		fieldType:   "Type",
+		fieldIP:     "I.PublicIpAddress",
+		fieldPing:   "Ping",
+		fieldLaunch: "I.LaunchTime",
+	}
+)
+
+const (
+	fieldRegion = "region"
+	fieldId     = "id"
+	fieldName   = "name"
+	fieldState  = "state"
+	fieldType   = "type"
+	fieldIP     = "ip"
+	fieldPing   = "ping"
+	fieldLaunch = "launch"
+)
