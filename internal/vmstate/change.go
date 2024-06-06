@@ -21,12 +21,14 @@ import (
 	"kevwargo/ec2-playground/internal/vmformat"
 )
 
-func SetupCommand(
-	cmd *cobra.Command,
+func BuildCommand(
 	sess *session.Global,
 	op func(context.Context, *ec2.Client, []string) ([]types.InstanceStateChange, error),
 ) *cobra.Command {
-	var dumpFormat config.VMFormat
+	var (
+		dumpFormat config.VMFormat
+		cmd        cobra.Command
+	)
 
 	cmd.RunE = func(c *cobra.Command, _ []string) error {
 		return changeState(c.Context(), changeStateInput{
@@ -38,7 +40,7 @@ func SetupCommand(
 
 	cmd.Flags().VarP(&dumpFormat, "format", "f", "Instance format")
 
-	return cmd
+	return &cmd
 }
 
 type changeStateInput struct {

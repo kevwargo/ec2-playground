@@ -12,11 +12,7 @@ import (
 )
 
 func Command(sess *session.Global) *cobra.Command {
-	return vmstate.SetupCommand(
-		&cobra.Command{
-			Use:   "start",
-			Short: "Start EC2 instances",
-		},
+	cmd := vmstate.BuildCommand(
 		sess,
 		func(ctx context.Context, client *ec2.Client, ids []string) ([]types.InstanceStateChange, error) {
 			resp, err := client.StartInstances(ctx, &ec2.StartInstancesInput{InstanceIds: ids})
@@ -27,4 +23,9 @@ func Command(sess *session.Global) *cobra.Command {
 			return resp.StartingInstances, nil
 		},
 	)
+
+	cmd.Use = "start"
+	cmd.Short = "Start EC2 instances"
+
+	return cmd
 }

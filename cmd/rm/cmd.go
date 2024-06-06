@@ -12,11 +12,7 @@ import (
 )
 
 func Command(sess *session.Global) *cobra.Command {
-	return vmstate.SetupCommand(
-		&cobra.Command{
-			Use:   "rm",
-			Short: "Terminate EC2 instances",
-		},
+	cmd := vmstate.BuildCommand(
 		sess,
 		func(ctx context.Context, client *ec2.Client, ids []string) ([]types.InstanceStateChange, error) {
 			resp, err := client.TerminateInstances(ctx, &ec2.TerminateInstancesInput{InstanceIds: ids})
@@ -27,4 +23,9 @@ func Command(sess *session.Global) *cobra.Command {
 			return resp.TerminatingInstances, nil
 		},
 	)
+
+	cmd.Use = "rm"
+	cmd.Short = "Terminate EC2 instances"
+
+	return cmd
 }
