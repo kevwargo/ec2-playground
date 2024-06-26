@@ -97,14 +97,25 @@ func (c *Global) resolveLiteral(ctx context.Context, regions []string) error {
 	errs := make([]error, len(regions))
 	for i := range errs {
 		resp := <-respC
-		errs[i] = resp.err
-
-		session := c.newRegional(resp.cfg)
-		c.regional[resp.cfg.Region] = session
-		if c.defaultRegional == nil {
-			c.defaultRegional = session
+		if err := resp.err; err != nil {
+			errs[i] = err
+		} else {
+			c.regional[resp.cfg.Region] = c.newRegional(resp.cfg)
 		}
 	}
 
-	return errors.Join(errs...)
+	if err := errors.Join(errs...); err != nil {
+		return err
+	}
+
+	if c.defaultRegional == nil {
+		for _, r := range regions {
+			if s, exists := c.regional[r]; exists {
+				c.defaultRegional = s
+				break
+			}
+		}
+	}
+
+	return nil
 }
