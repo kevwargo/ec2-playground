@@ -98,6 +98,7 @@ var (
 		fieldIP:     "I.PublicIpAddress",
 		fieldPing:   "Ping",
 		fieldLaunch: "I.LaunchTime",
+		fieldTags:   "Tags",
 	}
 )
 
@@ -110,4 +111,5 @@ const (
 	fieldIP     = "ip"
 	fieldPing   = "ping"
 	fieldLaunch = "launch"
+	fieldTags   = "tags"
 )
