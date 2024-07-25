@@ -22,7 +22,7 @@ func (s *Regional) Print(msg string, args ...any) {
 func (g *Global) log(w io.Writer, withTime bool, msg string, args ...any) {
 	msg = fmt.Sprintf(msg, args...)
 	if withTime {
-		msg = time.Now().Format("[2006-01-02 15:04:05] ") + msg
+		msg = fmt.Sprintf("[%s] %s", time.Now().Format(datetimeFormat), msg)
 	}
 
 	switch l := len(msg); l {
@@ -40,3 +40,7 @@ func (g *Global) log(w io.Writer, withTime bool, msg string, args ...any) {
 		printFn(w, msg)
 	}
 }
+
+const (
+	datetimeFormat = "2006-01-02 15:04:05"
+)
