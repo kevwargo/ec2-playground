@@ -6,7 +6,7 @@ type RunConfig struct {
 	Name             string
 	Tags             []string
 	Profile          string
-	Policy           string
+	Policies         []string
 	KeyPair          string
 	SSHPublicKeyFile string
 	SkipPublicIPv4   bool

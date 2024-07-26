@@ -36,7 +36,7 @@ func Command(sess *session.Global) *cobra.Command {
 	f.StringArrayVarP(&cfg.Tags, "tags", "T", nil, "A 'key=value' pairs of tags")
 
 	f.StringVar(&cfg.Profile, "profile", "", "The name or ARN of an IAM instance profile")
-	f.StringVar(&cfg.Policy, "policy", "", "The ARN of an IAM ManagedPolicy which will be attached to the instance's profile")
+	f.StringArrayVar(&cfg.Policies, "policy", nil, "The ARN of an IAM ManagedPolicy which will be attached to the instance's profile. Can be supplied multiple times to attach multiple policies.")
 
 	f.StringVarP(&cfg.KeyPair, flagKeyPair, "k", "", "Existing EC2 key pair")
 	f.StringVarP(&cfg.SSHPublicKeyFile, flagSSHPublicKeyFile, "s", "", "A path to the SSH public key file which will be imported and attached to the instance")

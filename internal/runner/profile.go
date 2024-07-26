@@ -23,12 +23,12 @@ func (r InstanceRunner) setProfile(ctx context.Context, in *ec2.RunInstancesInpu
 
 	if r.cfg.Profile != "" {
 		profile = r.cfg.Profile
-	} else if r.cfg.Policy != "" {
+	} else if len(r.cfg.Policies) > 0 {
 		err = r.sess.Global.RunIAM(ctx, func(ctx context.Context, iamClient *iam.Client) error {
 			builder := profileBuilder{
 				session:       r.sess.Global,
 				iam:           iamClient,
-				userPolicy:    r.cfg.Policy,
+				userPolicies:  r.cfg.Policies,
 				defaultPolicy: resources.InstancePolicy,
 				infraName:     r.cfg.InfraStackName,
 			}
@@ -58,27 +58,27 @@ func (r InstanceRunner) setProfile(ctx context.Context, in *ec2.RunInstancesInpu
 type profileBuilder struct {
 	session       *session.Global
 	iam           *iam.Client
-	userPolicy    string
+	userPolicies  []string
 	defaultPolicy string
 	infraName     string
 }
 
 func (b *profileBuilder) buildProfile(ctx context.Context) (string, error) {
-	policyHash, err := b.getPolicyHash(ctx, b.userPolicy)
+	policiesHash, err := b.getPolicyHash(ctx, b.userPolicies)
 	if err != nil {
 		return "", err
 	}
 
-	b.session.Log("hash(%s) = %s", b.userPolicy, policyHash)
+	b.session.Log("hash(%s) = %s", b.userPolicies, policiesHash)
 
-	profileName := fmt.Sprintf(instanceProfileFmt, b.infraName, policyHash)
+	profileName := fmt.Sprintf(instanceProfileFmt, b.infraName, policiesHash)
 	if exists, err := b.profileExists(ctx, profileName); exists {
 		return profileName, nil
 	} else if err != nil {
 		return "", err
 	}
 
-	role, err := b.createRole(ctx, policyHash)
+	role, err := b.createRole(ctx, policiesHash)
 	if err != nil {
 		return "", err
 	}
@@ -93,6 +93,8 @@ func (b *profileBuilder) buildProfile(ctx context.Context) (string, error) {
 func (b *profileBuilder) profileExists(ctx context.Context, name string) (bool, error) {
 	_, err := b.iam.GetInstanceProfile(ctx, &iam.GetInstanceProfileInput{InstanceProfileName: &name})
 	if err == nil {
+		b.session.Log("Instance profile %s already exists", name)
+
 		return true, nil
 	}
 
@@ -145,15 +147,19 @@ func (b *profileBuilder) createRole(ctx context.Context, policyHash string) (str
 	}
 	b.session.Log("Role %s created", roleName)
 
-	if err := b.attachPolicy(ctx, b.userPolicy, roleName); err != nil {
-		return "", err
+	for _, userPolicy := range b.userPolicies {
+		if err := b.attachPolicy(ctx, userPolicy, roleName); err != nil {
+			return "", err
+		}
 	}
+
 	if err := b.attachPolicy(ctx, b.defaultPolicy, roleName); err != nil {
 		return "", err
 	}
 	if err := b.attachPolicy(ctx, ssmPolicy, roleName); err != nil {
 		return "", err
 	}
+
 	b.session.Log("Attached policies to %s", roleName)
 
 	return roleName, nil
@@ -188,23 +194,28 @@ func (b *profileBuilder) createProfile(ctx context.Context, profileName, roleNam
 	return nil
 }
 
-func (b *profileBuilder) getPolicyHash(ctx context.Context, policy string) (string, error) {
-	policyResp, err := b.iam.GetPolicy(ctx, &iam.GetPolicyInput{PolicyArn: &policy})
-	if err != nil {
-		return "", err
-	}
-
-	versionResp, err := b.iam.GetPolicyVersion(ctx, &iam.GetPolicyVersionInput{
-		PolicyArn: &policy,
-		VersionId: policyResp.Policy.DefaultVersionId,
-	})
-	if err != nil {
-		return "", err
-	}
-
+func (b *profileBuilder) getPolicyHash(ctx context.Context, policies []string) (string, error) {
 	h := md5.New()
-	h.Write([]byte(*versionResp.PolicyVersion.Document))
+
+	for _, policy := range policies {
+		policyResp, err := b.iam.GetPolicy(ctx, &iam.GetPolicyInput{PolicyArn: &policy})
+		if err != nil {
+			return "", err
+		}
+
+		versionResp, err := b.iam.GetPolicyVersion(ctx, &iam.GetPolicyVersionInput{
+			PolicyArn: &policy,
+			VersionId: policyResp.Policy.DefaultVersionId,
+		})
+		if err != nil {
+			return "", err
+		}
+
+		h.Write([]byte(*versionResp.PolicyVersion.Document))
+	}
+
 	policyHash := base64.RawURLEncoding.EncodeToString(h.Sum(nil))
+
 	return policyHash, nil
 }
 
