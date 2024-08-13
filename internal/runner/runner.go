@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -107,10 +106,6 @@ func (r InstanceRunner) runInstances(ctx context.Context, input ec2.RunInstances
 func (r InstanceRunner) buildParams(ctx context.Context, resources infra.Resources) (runParams, error) {
 	in := r.createBasicInput(resources)
 
-	if err := r.setTags(&in); err != nil {
-		return runParams{}, err
-	}
-
 	waitForProfile, err := r.setProfile(ctx, &in, resources)
 	if err != nil {
 		return runParams{}, err
@@ -128,6 +123,11 @@ func (r InstanceRunner) buildParams(ctx context.Context, resources infra.Resourc
 		}
 
 		in.ImageId = &imageId
+
+		if err := r.setTags(ctx, &in, image); err != nil {
+			return runParams{}, err
+		}
+
 		inputs = append(inputs, in)
 	}
 
@@ -162,41 +162,6 @@ func (r InstanceRunner) createBasicInput(resources infra.Resources) ec2.RunInsta
 	}
 
 	return in
-}
-
-func (r InstanceRunner) setTags(in *ec2.RunInstancesInput) error {
-	tagsMap := make(map[string]string)
-
-	for _, expr := range r.cfg.Tags {
-		parts := strings.SplitN(expr, "=", 2)
-		if len(parts) != 2 {
-			return fmt.Errorf("invalid tag specification: %q", expr)
-		}
-
-		tagsMap[parts[0]] = parts[1]
-	}
-
-	if r.cfg.Name != "" {
-		tagsMap["Name"] = r.cfg.Name
-	}
-
-	if len(tagsMap) == 0 {
-		return nil
-	}
-
-	tags := make([]types.Tag, 0, len(tagsMap))
-	for k, v := range tagsMap {
-		tags = append(tags, types.Tag{Key: aws.String(k), Value: aws.String(v)})
-	}
-
-	in.TagSpecifications = []types.TagSpecification{
-		{
-			ResourceType: types.ResourceTypeInstance,
-			Tags:         tags,
-		},
-	}
-
-	return nil
 }
 
 const (
