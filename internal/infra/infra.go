@@ -8,8 +8,11 @@ import (
 	"fmt"
 	"regexp"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/cloudformation"
 	"github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
+	"github.com/aws/aws-sdk-go-v2/service/ec2"
+	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	"github.com/aws/smithy-go"
 
 	"kevwargo/ec2-playground/internal/config"
@@ -29,7 +32,8 @@ var (
 )
 
 const (
-	errCodeValidation = "ValidationError"
+	errCodeValidation   = "ValidationError"
+	defaultVPCParamName = "DefaultVPC"
 )
 
 type Resources struct {
@@ -92,7 +96,12 @@ func (f Fetcher) Fetch(ctx context.Context) (Resources, error) {
 }
 
 func (f Fetcher) deploy(ctx context.Context) error {
-	stackID, err := f.tryStartUpdate(ctx)
+	params, err := f.prepareStackParams(ctx)
+	if err != nil {
+		return err
+	}
+
+	stackID, err := f.tryStartUpdate(ctx, params)
 	if err != nil {
 		if errors.Is(err, noUpdates) {
 			return nil
@@ -102,7 +111,7 @@ func (f Fetcher) deploy(ctx context.Context) error {
 	}
 
 	if stackID == "" {
-		stackID, err = f.startCreate(ctx)
+		stackID, err = f.startCreate(ctx, params)
 		if err != nil {
 			return err
 		}
@@ -111,11 +120,12 @@ func (f Fetcher) deploy(ctx context.Context) error {
 	return f.wait(ctx, stackID, types.StackStatusCreateComplete, types.StackStatusUpdateComplete)
 }
 
-func (f Fetcher) tryStartUpdate(ctx context.Context) (string, error) {
+func (f Fetcher) tryStartUpdate(ctx context.Context, params []types.Parameter) (string, error) {
 	resp, err := f.session.CFN().UpdateStack(ctx, &cloudformation.UpdateStackInput{
 		StackName:    &f.stackName,
 		Capabilities: []types.Capability{types.CapabilityCapabilityIam},
 		TemplateBody: &templateBody,
+		Parameters:   params,
 	})
 
 	if err == nil {
@@ -177,11 +187,12 @@ func (f Fetcher) deleteRolledBack(ctx context.Context, stackID string) error {
 	return f.wait(ctx, stackID, types.StackStatusDeleteComplete)
 }
 
-func (f Fetcher) startCreate(ctx context.Context) (string, error) {
+func (f Fetcher) startCreate(ctx context.Context, params []types.Parameter) (string, error) {
 	resp, err := f.session.CFN().CreateStack(ctx, &cloudformation.CreateStackInput{
 		StackName:    &f.stackName,
 		Capabilities: []types.Capability{types.CapabilityCapabilityIam},
 		TemplateBody: &templateBody,
+		Parameters:   params,
 	})
 	if err != nil {
 		return "", err
@@ -189,4 +200,44 @@ func (f Fetcher) startCreate(ctx context.Context) (string, error) {
 
 	f.session.Log("Creating stack %q", *resp.StackId)
 	return *resp.StackId, nil
+}
+
+func (f Fetcher) prepareStackParams(ctx context.Context) ([]types.Parameter, error) {
+	defaultVPC, err := f.getDefaultVPC(ctx)
+	if defaultVPC == "" {
+		return nil, err
+	}
+
+	return []types.Parameter{
+		{
+			ParameterKey:   aws.String(defaultVPCParamName),
+			ParameterValue: &defaultVPC,
+		},
+	}, nil
+}
+
+func (f Fetcher) getDefaultVPC(ctx context.Context) (string, error) {
+	paginator := ec2.NewDescribeVpcsPaginator(f.session.EC2(), &ec2.DescribeVpcsInput{
+		Filters: []ec2types.Filter{
+			{
+				Name:   aws.String("is-default"),
+				Values: []string{"true"},
+			},
+		},
+	})
+
+	for paginator.HasMorePages() {
+		page, err := paginator.NextPage(ctx)
+		if err != nil {
+			return "", err
+		}
+
+		for _, vpc := range page.Vpcs {
+			if vpc.VpcId != nil {
+				return *vpc.VpcId, nil
+			}
+		}
+	}
+
+	return "", nil
 }
