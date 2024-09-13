@@ -43,6 +43,8 @@ func Command(sess *session.Global) *cobra.Command {
 	f.BoolVar(&cfg.SkipPublicIPv4, "skip-public-ipv4", false, "Don't assign an IPv4 address to the instance")
 	cmd.MarkFlagsMutuallyExclusive(flagKeyPair, flagSSHPublicKeyFile)
 
+	f.StringVarP(&cfg.UserData, "user-data", "u", "", "The script file containing user-data")
+
 	f.StringVar(&cfg.InfraStackName, "infra-stack", infra.DefaultStackName, "Infra stack name")
 	f.BoolVar(&cfg.SkipInfraDeploy, "skip-infra-deploy", false, "Don't attempt to deploy the infra stack")
 

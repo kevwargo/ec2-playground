@@ -115,6 +115,10 @@ func (r InstanceRunner) buildParams(ctx context.Context, resources infra.Resourc
 		return runParams{}, err
 	}
 
+	if err := r.setUserData(&in); err != nil {
+		return runParams{}, err
+	}
+
 	var inputs []ec2.RunInstancesInput
 	for _, image := range r.cfg.Images {
 		imageId, err := r.imageResolver.Resolve(ctx, image)
