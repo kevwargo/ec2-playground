@@ -42,7 +42,7 @@ func (r InstanceRunner) setTags(ctx context.Context, in *ec2.RunInstancesInput, 
 			ec2: r.sess.EC2(),
 		})
 		if err != nil {
-			return err
+			return fmt.Errorf("expanding tag %q=%q for image %q: %w", k, v, *in.ImageId, err)
 		}
 
 		tags = append(tags, types.Tag{Key: aws.String(k), Value: aws.String(expanded)})
@@ -80,6 +80,10 @@ func (d *tagTemplateData) Image() (*types.Image, error) {
 		return nil, err
 	}
 
+	if len(resp.Images) == 0 {
+		return nil, fmt.Errorf("image %s not found", d.ImageID)
+	}
+
 	d.image = &resp.Images[0]
 
 	return d.image, nil
@@ -92,6 +96,30 @@ func (d *tagTemplateData) CreationDate() (string, error) {
 	}
 
 	return (*image.CreationDate)[:10], nil
+}
+
+func (d *tagTemplateData) OSType() (string, error) {
+	image, err := d.Image()
+	if err != nil {
+		return "", err
+	}
+
+	if image.Platform != "" {
+		return string(image.Platform), nil
+	}
+
+	if image.PlatformDetails == nil {
+		return "", nil
+	}
+
+	platform := strings.ToLower(*image.PlatformDetails)
+	for _, ostype := range []string{"windows", "linux"} {
+		if strings.Contains(platform, ostype) {
+			return ostype, nil
+		}
+	}
+
+	return "", nil
 }
 
 func expandTagValue(tmplText string, data *tagTemplateData) (string, error) {
