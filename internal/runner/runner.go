@@ -70,21 +70,13 @@ type runParams struct {
 func (r InstanceRunner) runInstances(ctx context.Context, input ec2.RunInstancesInput, waitForProfile bool) error {
 	resp, err := r.sess.EC2().RunInstances(ctx, &input)
 
-	for waitForProfile && err != nil {
-		var ae smithy.APIError
-		if !errors.As(err, &ae) {
-			return err
+	if waitForProfile {
+		for profileNotReady(err, *input.IamInstanceProfile.Name) {
+			r.sess.Log("%s waiting for profile %s", *input.ImageId, *input.IamInstanceProfile.Name)
+			time.Sleep(time.Second)
+
+			resp, err = r.sess.EC2().RunInstances(ctx, &input)
 		}
-
-		if ae.ErrorCode() != errProfileInvalidCode ||
-			ae.ErrorMessage() != fmt.Sprintf(errProfileInvalidMsgTmpl, *input.IamInstanceProfile.Name) {
-			return err
-		}
-
-		r.sess.Log("%s waiting for profile %s", *input.ImageId, *input.IamInstanceProfile.Name)
-		time.Sleep(time.Second)
-
-		resp, err = r.sess.EC2().RunInstances(ctx, &input)
 	}
 
 	if err != nil {
@@ -101,6 +93,19 @@ func (r InstanceRunner) runInstances(ctx context.Context, input ec2.RunInstances
 	}
 
 	return nil
+}
+
+func profileNotReady(err error, profileName string) bool {
+	var ae smithy.APIError
+	if !errors.As(err, &ae) {
+		return false
+	}
+
+	if ae.ErrorCode() != errProfileInvalidCode {
+		return false
+	}
+
+	return ae.ErrorMessage() == fmt.Sprintf(errProfileInvalidMsgTmpl, profileName)
 }
 
 func (r InstanceRunner) buildParams(ctx context.Context, resources infra.Resources) (runParams, error) {

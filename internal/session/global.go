@@ -21,29 +21,29 @@ type Global struct {
 	logMutex        sync.Mutex
 }
 
-func (c *Global) init(ctx context.Context) error {
-	if c.defaultRegional != nil && c.regional != nil {
+func (g *Global) init(ctx context.Context) error {
+	if g.defaultRegional != nil && g.regional != nil {
 		return nil
 	}
 
-	if len(c.Regions) == 1 && c.Regions[0] == "all" {
-		return c.resolveAll(ctx)
+	if len(g.Regions) == 1 && g.Regions[0] == "all" {
+		return g.resolveAll(ctx)
 	}
 
-	if len(c.Regions) == 0 {
-		return c.resolveDefault(ctx)
+	if len(g.Regions) == 0 {
+		return g.resolveDefault(ctx)
 	}
 
-	return c.resolveLiteral(ctx, c.Regions)
+	return g.resolveLiteral(ctx, g.Regions)
 }
 
-func (c *Global) resolveAll(ctx context.Context) error {
-	if err := c.resolveDefault(ctx); err != nil {
+func (g *Global) resolveAll(ctx context.Context) error {
+	if err := g.resolveDefault(ctx); err != nil {
 		return err
 	}
 
-	ec2Client := ec2.NewFromConfig(c.defaultRegional.cfg)
-	c.defaultRegional.ec2 = ec2Client
+	ec2Client := ec2.NewFromConfig(g.defaultRegional.cfg)
+	g.defaultRegional.ec2 = ec2Client
 
 	resp, err := ec2Client.DescribeRegions(ctx, &ec2.DescribeRegionsInput{AllRegions: aws.Bool(false)})
 	if err != nil {
@@ -52,22 +52,22 @@ func (c *Global) resolveAll(ctx context.Context) error {
 
 	regions := make([]string, 0, len(resp.Regions)-1)
 	for _, r := range resp.Regions {
-		if *r.RegionName != c.defaultRegional.cfg.Region {
+		if *r.RegionName != g.defaultRegional.cfg.Region {
 			regions = append(regions, *r.RegionName)
 		}
 	}
 
-	return c.resolveLiteral(ctx, regions)
+	return g.resolveLiteral(ctx, regions)
 }
 
-func (c *Global) resolveDefault(ctx context.Context) error {
+func (g *Global) resolveDefault(ctx context.Context) error {
 	cfg, err := config.LoadDefaultConfig(ctx)
 	if err != nil {
 		return err
 	}
 
-	c.defaultRegional = c.newRegional(cfg)
-	c.regional = map[string]*Regional{cfg.Region: c.defaultRegional}
+	g.defaultRegional = g.newRegional(cfg)
+	g.regional = map[string]*Regional{cfg.Region: g.defaultRegional}
 
 	return nil
 }
@@ -77,7 +77,7 @@ type resolveResp struct {
 	err error
 }
 
-func (c *Global) resolveLiteral(ctx context.Context, regions []string) error {
+func (g *Global) resolveLiteral(ctx context.Context, regions []string) error {
 	respC := make(chan resolveResp)
 
 	for _, r := range regions {
@@ -90,17 +90,16 @@ func (c *Global) resolveLiteral(ctx context.Context, regions []string) error {
 		}(r)
 	}
 
-	if c.regional == nil {
-		c.regional = make(map[string]*Regional)
+	if g.regional == nil {
+		g.regional = make(map[string]*Regional)
 	}
 
-	errs := make([]error, len(regions))
-	for i := range errs {
-		resp := <-respC
+	var errs []error
+	for resp := range respC {
 		if err := resp.err; err != nil {
-			errs[i] = err
+			errs = append(errs, err)
 		} else {
-			c.regional[resp.cfg.Region] = c.newRegional(resp.cfg)
+			g.regional[resp.cfg.Region] = g.newRegional(resp.cfg)
 		}
 	}
 
@@ -108,10 +107,10 @@ func (c *Global) resolveLiteral(ctx context.Context, regions []string) error {
 		return err
 	}
 
-	if c.defaultRegional == nil {
+	if g.defaultRegional == nil {
 		for _, r := range regions {
-			if s, exists := c.regional[r]; exists {
-				c.defaultRegional = s
+			if s, exists := g.regional[r]; exists {
+				g.defaultRegional = s
 				break
 			}
 		}
