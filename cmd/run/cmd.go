@@ -45,8 +45,8 @@ func Command(sess *session.Global) *cobra.Command {
 
 	f.StringVarP(&cfg.UserData, "user-data", "u", "", "The script file containing user-data")
 
-	f.StringVar(&cfg.InfraStackName, "infra-stack", infra.DefaultStackName, "Infra stack name")
-	f.BoolVar(&cfg.SkipInfraDeploy, "skip-infra-deploy", false, "Don't attempt to deploy the infra stack")
+	f.StringVar(&cfg.Infra.StackName, "infra-stack", infra.DefaultStackName, "Infra stack name")
+	f.BoolVar(&cfg.Infra.SkipDeploy, "skip-infra-deploy", false, "Don't attempt to deploy the infra stack")
 
 	f.VarP(&cfg.DumpFormat, "dump-format", "f", "Format for printing new instances")
 	f.BoolVarP(&cfg.DryRun, "dry-run", "d", false, "Dry run operation")

@@ -30,7 +30,7 @@ func (r InstanceRunner) setProfile(ctx context.Context, in *ec2.RunInstancesInpu
 				iam:           iamClient,
 				userPolicies:  r.cfg.Policies,
 				defaultPolicy: resources.InstancePolicy,
-				infraName:     r.cfg.InfraStackName,
+				infraName:     r.cfg.Infra.StackName,
 			}
 
 			profileName, err := builder.buildProfile(ctx)

@@ -107,7 +107,7 @@ func (r InstanceRunner) readSSHKey(keyFile string) (sshKey, error) {
 	return sshKey{
 		data:        data,
 		fingerprint: fp,
-		name:        fmt.Sprintf("%s-%s", r.cfg.InfraStackName, base64.RawURLEncoding.EncodeToString(fp)),
+		name:        fmt.Sprintf("%s-%s", r.cfg.Infra.StackName, base64.RawURLEncoding.EncodeToString(fp)),
 	}, nil
 }
 

@@ -37,11 +37,11 @@ const (
 )
 
 type Resources struct {
-	SecurityGroup   string
-	Subnet          string
-	InstancePolicy  string
-	InstanceProfile string
-	Bucket          string
+	SecurityGroup   string `json:"SecurityGroup"`
+	Subnet          string `json:"Subnet"`
+	InstancePolicy  string `json:"InstancePolicy"`
+	InstanceProfile string `json:"InstanceProfile"`
+	Bucket          string `json:"Bucket"`
 }
 
 type Fetcher struct {
@@ -50,11 +50,11 @@ type Fetcher struct {
 	skipDeploy bool
 }
 
-func NewFetcher(sess *session.Regional, cfg config.RunConfig) Fetcher {
+func NewFetcher(sess *session.Regional, cfg config.InfraConfig) Fetcher {
 	return Fetcher{
 		session:    sess,
-		stackName:  cfg.InfraStackName,
-		skipDeploy: cfg.SkipInfraDeploy,
+		stackName:  cfg.StackName,
+		skipDeploy: cfg.SkipDeploy,
 	}
 }
 

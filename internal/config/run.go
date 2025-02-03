@@ -11,8 +11,7 @@ type RunConfig struct {
 	SSHPublicKeyFile string
 	SkipPublicIPv4   bool
 	UserData         string
-	InfraStackName   string
-	SkipInfraDeploy  bool
+	Infra            InfraConfig
 	DumpFormat       VMFormat
 	DryRun           bool
 }

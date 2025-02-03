@@ -5,6 +5,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	dumpinfra "kevwargo/ec2-playground/cmd/dump-infra"
 	"kevwargo/ec2-playground/cmd/exec"
 	"kevwargo/ec2-playground/cmd/ls"
 	"kevwargo/ec2-playground/cmd/rm"
@@ -33,6 +34,7 @@ func Execute() {
 	rootCmd.AddCommand(start.Command(&sess))
 	rootCmd.AddCommand(stop.Command(&sess))
 	rootCmd.AddCommand(ssh.Command())
+	rootCmd.AddCommand(dumpinfra.Command(&sess))
 
 	if err := rootCmd.Execute(); err != nil {
 		log.Fatal(err)

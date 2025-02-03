@@ -30,7 +30,7 @@ func New(cfg config.RunConfig, sess *session.Regional) InstanceRunner {
 	return InstanceRunner{
 		cfg:           cfg,
 		sess:          sess,
-		infraFetcher:  infra.NewFetcher(sess, cfg),
+		infraFetcher:  infra.NewFetcher(sess, cfg.Infra),
 		formatter:     vmformat.New(sess, cfg.DumpFormat.Template()),
 		imageResolver: images.NewResolver(sess.SSM()),
 	}
