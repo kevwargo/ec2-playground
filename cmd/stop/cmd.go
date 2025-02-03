@@ -25,7 +25,7 @@ func Command(sess *session.Global) *cobra.Command {
 	)
 
 	cmd.Use = "stop"
-	cmd.Short = "Sop EC2 instances"
+	cmd.Short = "Stop EC2 instances"
 
 	return cmd
 }
