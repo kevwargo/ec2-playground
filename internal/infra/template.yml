@@ -127,14 +127,23 @@ Resources:
         Statement:
           - Effect: Allow
             Action:
+              - s3:GetObject
               - s3:PutObject
               - s3:PutObjectAcl
             Resource:
               - !Sub 'arn:aws:s3:::${Bucket}/*'
           - Effect: Allow
             Action:
-              - ssm:PutParameter
+              - s3:ListBucket
+            Resource:
+              - !GetAtt Bucket.Arn
+          - Effect: Allow
+            Action:
+              - ec2:CreateTags
             Resource: "*"
+            Condition:
+              StringLike:
+                aws:UserId: "*:${ec2:InstanceID}"
 
   InstanceRole:
     Type: AWS::IAM::Role
