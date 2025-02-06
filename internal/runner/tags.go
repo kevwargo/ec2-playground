@@ -12,7 +12,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
 )
 
-func (r InstanceRunner) setTags(ctx context.Context, in *ec2.RunInstancesInput, imageName string) error {
+func (r InstanceRunner) setTags(ctx context.Context, in *ec2.RunInstancesInput, imageSpec string) error {
 	tagsMap := make(map[string]string)
 
 	for _, expr := range r.cfg.Tags {
@@ -35,7 +35,7 @@ func (r InstanceRunner) setTags(ctx context.Context, in *ec2.RunInstancesInput, 
 	tags := make([]types.Tag, 0, len(tagsMap))
 	for k, v := range tagsMap {
 		expanded, err := expandTagValue(v, &tagTemplateData{
-			ImageName: imageName,
+			ImageSpec: imageSpec,
 			ImageID:   *in.ImageId,
 
 			ctx: ctx,
@@ -58,8 +58,22 @@ func (r InstanceRunner) setTags(ctx context.Context, in *ec2.RunInstancesInput, 
 	return nil
 }
 
+func expandTagValue(tmplText string, data *tagTemplateData) (string, error) {
+	tmpl, err := template.New("tag").Parse(tmplText)
+	if err != nil {
+		return "", err
+	}
+
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, data); err != nil {
+		return "", err
+	}
+
+	return buf.String(), nil
+}
+
 type tagTemplateData struct {
-	ImageName string
+	ImageSpec string
 	ImageID   string
 
 	ctx context.Context
@@ -122,16 +136,12 @@ func (d *tagTemplateData) OSType() (string, error) {
 	return "", nil
 }
 
-func expandTagValue(tmplText string, data *tagTemplateData) (string, error) {
-	tmpl, err := template.New("tag").Parse(tmplText)
+func (d *tagTemplateData) ImageName() (string, error) {
+	image, err := d.Image()
 	if err != nil {
 		return "", err
 	}
 
-	var buf bytes.Buffer
-	if err := tmpl.Execute(&buf, data); err != nil {
-		return "", err
-	}
-
-	return buf.String(), nil
+	parts := strings.Split(*image.Name, "/")
+	return parts[len(parts)-1], nil
 }
