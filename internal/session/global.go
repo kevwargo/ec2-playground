@@ -80,14 +80,14 @@ type resolveResp struct {
 func (g *Global) resolveLiteral(ctx context.Context, regions []string) error {
 	respC := make(chan resolveResp)
 
-	for _, r := range regions {
-		go func(region string) {
+	for _, region := range regions {
+		go func() {
 			cfg, err := config.LoadDefaultConfig(ctx, config.WithRegion(region))
 			respC <- resolveResp{
 				cfg: cfg,
 				err: err,
 			}
-		}(r)
+		}()
 	}
 
 	if g.regional == nil {
@@ -95,7 +95,8 @@ func (g *Global) resolveLiteral(ctx context.Context, regions []string) error {
 	}
 
 	var errs []error
-	for resp := range respC {
+	for range len(regions) {
+		resp := <-respC
 		if err := resp.err; err != nil {
 			errs = append(errs, err)
 		} else {
