@@ -23,8 +23,9 @@ type instanceData struct {
 
 	tags map[string]string
 
-	ssm     *ssm.Client
-	ssmInfo *ssmtypes.InstanceInformation
+	ssm      *ssm.Client
+	ssmCache *ssmCache
+	ssmInfo  *ssmtypes.InstanceInformation
 }
 
 func (f Formatter) prepareInstanceData(ctx context.Context, instance types.Instance) *instanceData {
@@ -35,8 +36,9 @@ func (f Formatter) prepareInstanceData(ctx context.Context, instance types.Insta
 		Region: f.session.Region,
 		I:      instance,
 
-		ctx: ctx,
-		ssm: f.session.SSM(),
+		ctx:      ctx,
+		ssm:      f.session.SSM(),
+		ssmCache: f.ssmCache,
 	}
 }
 
@@ -68,6 +70,10 @@ func (i *instanceData) Tags() tags {
 }
 
 func (i *instanceData) SSM() (*ssmtypes.InstanceInformation, error) {
+	if i.ssmCache != nil {
+		return i.ssmCache.resolve(i.ctx, i.Id)
+	}
+
 	if i.ssmInfo != nil {
 		return i.ssmInfo, nil
 	}

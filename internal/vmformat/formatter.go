@@ -21,14 +21,16 @@ func (v VM) String() string {
 }
 
 type Formatter struct {
-	session *session.Regional
-	tmpl    *template.Template
+	session  *session.Regional
+	tmpl     *template.Template
+	ssmCache *ssmCache
 }
 
 func New(sess *session.Regional, tmpl *template.Template) Formatter {
 	return Formatter{
-		session: sess,
-		tmpl:    tmpl,
+		session:  sess,
+		tmpl:     tmpl,
+		ssmCache: initSSMCache(sess),
 	}
 }
 
