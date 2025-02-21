@@ -42,23 +42,21 @@ func (w *statusWaiter) wait(ctx context.Context) error {
 		return err
 	}
 
-	if inProgress(status) {
-		for inProgress(status) {
-			if err := w.logEvents(ctx); err != nil {
-				return err
-			}
-
-			time.Sleep(waitInterval)
-
-			status, err = w.getStatus(ctx)
-			if err != nil {
-				return err
-			}
-		}
-
+	for inProgress(status) {
 		if err := w.logEvents(ctx); err != nil {
 			return err
 		}
+
+		time.Sleep(waitInterval)
+
+		status, err = w.getStatus(ctx)
+		if err != nil {
+			return err
+		}
+	}
+
+	if err := w.logEvents(ctx); err != nil {
+		return err
 	}
 
 	if slices.Contains(w.desiredStatuses, status) {
