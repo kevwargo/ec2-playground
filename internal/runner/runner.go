@@ -14,6 +14,7 @@ import (
 	"kevwargo/ec2-playground/internal/config"
 	"kevwargo/ec2-playground/internal/images"
 	"kevwargo/ec2-playground/internal/infra"
+	"kevwargo/ec2-playground/internal/runner/userdata"
 	"kevwargo/ec2-playground/internal/session"
 	"kevwargo/ec2-playground/internal/vmformat"
 )
@@ -120,9 +121,11 @@ func (r InstanceRunner) buildParams(ctx context.Context, resources infra.Resourc
 		return runParams{}, err
 	}
 
-	if err := r.setUserData(&in); err != nil {
+	userData, err := userdata.Build(r.cfg.UserData)
+	if err != nil {
 		return runParams{}, err
 	}
+	in.UserData = userData
 
 	var inputs []ec2.RunInstancesInput
 	for _, image := range r.cfg.Images {
