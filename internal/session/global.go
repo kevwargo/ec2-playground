@@ -78,6 +78,10 @@ type resolveResp struct {
 }
 
 func (g *Global) resolveLiteral(ctx context.Context, regions []string) error {
+	if g.regional == nil {
+		g.regional = make(map[string]*Regional)
+	}
+
 	respC := make(chan resolveResp)
 
 	for _, region := range regions {
@@ -88,10 +92,6 @@ func (g *Global) resolveLiteral(ctx context.Context, regions []string) error {
 				err: err,
 			}
 		}()
-	}
-
-	if g.regional == nil {
-		g.regional = make(map[string]*Regional)
 	}
 
 	var errs []error
