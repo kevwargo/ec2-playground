@@ -7,6 +7,7 @@ import (
 
 	dumpinfra "kevwargo/ec2-playground/cmd/dump-infra"
 	"kevwargo/ec2-playground/cmd/exec"
+	"kevwargo/ec2-playground/cmd/images"
 	"kevwargo/ec2-playground/cmd/ls"
 	"kevwargo/ec2-playground/cmd/rdp"
 	"kevwargo/ec2-playground/cmd/rm"
@@ -35,6 +36,7 @@ func Execute() {
 	rootCmd.AddCommand(start.Command(&sess))
 	rootCmd.AddCommand(stop.Command(&sess))
 	rootCmd.AddCommand(rdp.Command(&sess))
+	rootCmd.AddCommand(images.Command(&sess))
 	rootCmd.AddCommand(ssh.Command())
 	rootCmd.AddCommand(dumpinfra.Command(&sess))
 
