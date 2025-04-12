@@ -1,7 +1,13 @@
 package main
 
-import "kevwargo/ec2-playground/cmd"
+import (
+	"log"
+
+	"kevwargo/ec2-playground/cmd"
+)
 
 func main() {
-	cmd.Execute()
+	if err := cmd.Execute(); err != nil {
+		log.Fatal(err)
+	}
 }

@@ -2,13 +2,10 @@ package lister
 
 import (
 	"context"
-	"errors"
-	"slices"
 	"text/template"
 
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
-	"github.com/aws/smithy-go"
 
 	"kevwargo/ec2-playground/internal/session"
 	"kevwargo/ec2-playground/internal/vmformat"
@@ -35,7 +32,7 @@ func (l VMLister) ListVMs(ctx context.Context) ([]vmformat.VM, error) {
 	for paginator.HasMorePages() {
 		page, err := paginator.NextPage(ctx)
 		if err != nil {
-			return nil, ignoreErrorCodes(err, "UnauthorizedOperation", "AuthFailure")
+			return nil, err
 		}
 
 		for _, reservation := range page.Reservations {
@@ -55,14 +52,4 @@ func (l VMLister) ListVMs(ctx context.Context) ([]vmformat.VM, error) {
 	}
 
 	return vms, nil
-}
-
-func ignoreErrorCodes(err error, codes ...string) error {
-	if ae := smithy.APIError(nil); errors.As(err, &ae) {
-		if c := ae.ErrorCode(); slices.Contains(codes, c) {
-			return nil
-		}
-	}
-
-	return err
 }
