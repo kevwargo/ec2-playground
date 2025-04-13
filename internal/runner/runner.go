@@ -33,7 +33,7 @@ func New(cfg config.RunConfig, sess *session.Regional) InstanceRunner {
 		sess:          sess,
 		infraFetcher:  infra.NewFetcher(sess, cfg.Infra),
 		formatter:     vmformat.New(sess, cfg.DumpFormat.Template()),
-		imageResolver: images.NewResolver(sess.SSM()),
+		imageResolver: images.NewResolver(sess.SSM(), sess.EC2()),
 	}
 }
 
@@ -127,14 +127,14 @@ func (r InstanceRunner) buildParams(ctx context.Context, resources infra.Resourc
 	}
 	in.UserData = userData
 
-	var inputs []ec2.RunInstancesInput
-	for _, image := range r.cfg.Images {
-		imageId, err := r.imageResolver.Resolve(ctx, image)
-		if err != nil {
-			return runParams{}, err
-		}
+	resolvedImages, err := r.imageResolver.Resolve(ctx, r.cfg.Images)
+	if err != nil {
+		return runParams{}, err
+	}
 
-		in.ImageId = &imageId
+	var inputs []ec2.RunInstancesInput
+	for _, image := range resolvedImages {
+		in.ImageId = &image.ID
 
 		if err := r.setTags(ctx, &in, image); err != nil {
 			return runParams{}, err

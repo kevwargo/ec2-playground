@@ -10,9 +10,11 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
+
+	"kevwargo/ec2-playground/internal/images"
 )
 
-func (r InstanceRunner) setTags(ctx context.Context, in *ec2.RunInstancesInput, imageSpec string) error {
+func (r InstanceRunner) setTags(ctx context.Context, in *ec2.RunInstancesInput, image images.Image) error {
 	tagsMap := make(map[string]string)
 
 	for _, expr := range r.cfg.Tags {
@@ -35,8 +37,9 @@ func (r InstanceRunner) setTags(ctx context.Context, in *ec2.RunInstancesInput, 
 	tags := make([]types.Tag, 0, len(tagsMap))
 	for k, v := range tagsMap {
 		expanded, err := expandTagValue(v, &tagTemplateData{
-			ImageSpec: imageSpec,
+			ImageSpec: image.Spec,
 			ImageID:   *in.ImageId,
+			image:     image.Details,
 
 			ctx: ctx,
 			ec2: r.sess.EC2(),
