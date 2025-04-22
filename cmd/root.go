@@ -83,6 +83,7 @@ type awsErrorPattern struct {
 
 var ignoredAccessErrors = []awsErrorPattern{
 	{"EC2", "UnauthorizedOperation"},
+	{"EC2", "AuthFailure"},
 	{"CloudFormation", "AccessDenied"},
 	{"SSM", "AccessDeniedException"},
 }
