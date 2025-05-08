@@ -63,46 +63,15 @@ func execute(ctx context.Context, ec2Client *ec2.Client, cfg config) error {
 }
 
 func getRDPData(ctx context.Context, ec2Client *ec2.Client, cfg config) (rdpData, error) {
-	var params ec2.DescribeInstancesInput
-	if strings.HasPrefix(cfg.instanceSpec, "i-") {
-		params.InstanceIds = []string{cfg.instanceSpec}
-	} else {
-		params.Filters = []types.Filter{
-			{
-				Name:   aws.String("tag:Name"),
-				Values: []string{cfg.instanceSpec},
-			},
-			{
-				Name:   aws.String("platform"),
-				Values: []string{"windows"},
-			},
-			{
-				Name:   aws.String("instance-state-name"),
-				Values: []string{"running"},
-			},
-		}
-	}
-
-	resp, err := ec2Client.DescribeInstances(ctx, &params)
+	instance, err := getMatchingInstance(ctx, ec2Client, cfg.instanceSpec)
 	if err != nil {
 		return rdpData{}, err
 	}
 
-	var instances []types.Instance
-	for _, r := range resp.Reservations {
-		instances = append(instances, r.Instances...)
-	}
-	if len(instances) == 0 {
-		return rdpData{}, fmt.Errorf("instance %q is not found", cfg.instanceSpec)
-	}
-	if len(instances) > 1 {
-		return rdpData{}, fmt.Errorf("there are more than one running instance with the name %q", cfg.instanceSpec)
-	}
-
-	instanceID := *instances[0].InstanceId
+	instanceID := *instance.InstanceId
 	log.Printf("Found instance %s", instanceID)
 
-	publicIP := instances[0].PublicIpAddress
+	publicIP := instance.PublicIpAddress
 	if publicIP == nil {
 		return rdpData{}, fmt.Errorf("instance %s does not have a public IP", instanceID)
 	}
@@ -113,7 +82,7 @@ func getRDPData(ctx context.Context, ec2Client *ec2.Client, cfg config) (rdpData
 	}
 
 	if pwdResp.PasswordData == nil || *pwdResp.PasswordData == "" {
-		return rdpData{}, fmt.Errorf("password data for %s is not yet ready", instanceID)
+		return rdpData{}, fmt.Errorf("password data for %s is not ready yet", instanceID)
 	}
 
 	password, err := decryptEC2Password(*pwdResp.PasswordData, cfg.sshKeyFile)
@@ -125,6 +94,48 @@ func getRDPData(ctx context.Context, ec2Client *ec2.Client, cfg config) (rdpData
 		publicIP: *publicIP,
 		password: password,
 	}, nil
+}
+
+func getMatchingInstance(ctx context.Context, ec2Client *ec2.Client, instanceSpec string) (types.Instance, error) {
+	params := ec2.DescribeInstancesInput{
+		Filters: []types.Filter{
+			{
+				Name:   aws.String("platform"),
+				Values: []string{"windows"},
+			},
+			{
+				Name:   aws.String("instance-state-name"),
+				Values: []string{"running"},
+			},
+		},
+	}
+
+	if strings.HasPrefix(instanceSpec, "i-") {
+		params.InstanceIds = []string{instanceSpec}
+	} else {
+		params.Filters = append(params.Filters, types.Filter{
+			Name:   aws.String("tag:Name"),
+			Values: []string{instanceSpec},
+		})
+	}
+
+	resp, err := ec2Client.DescribeInstances(ctx, &params)
+	if err != nil {
+		return types.Instance{}, err
+	}
+
+	var instances []types.Instance
+	for _, r := range resp.Reservations {
+		instances = append(instances, r.Instances...)
+	}
+	if len(instances) == 0 {
+		return types.Instance{}, fmt.Errorf("instance %q is not a running Windows instance", instanceSpec)
+	}
+	if len(instances) > 1 {
+		return types.Instance{}, fmt.Errorf("there are more than one running instance with the name %q", instanceSpec)
+	}
+
+	return instances[0], nil
 }
 
 func decryptEC2Password(encPassword, sshKeyFile string) (string, error) {
