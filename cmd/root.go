@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"errors"
+	"os"
 
 	"github.com/aws/smithy-go"
 	"github.com/spf13/cobra"
@@ -29,6 +30,9 @@ func Execute() error {
 		Use:           "ec2",
 		SilenceErrors: true,
 		SilenceUsage:  true,
+		CompletionOptions: cobra.CompletionOptions{
+			DisableDefaultCmd: true,
+		},
 	}
 
 	rootCmd.PersistentFlags().StringSliceVarP(&sess.Regions, "regions", "r", nil, "List of regions, comma-separated")
@@ -45,16 +49,26 @@ func Execute() error {
 }
 
 func addCommands(rootCmd *cobra.Command, sess *session.Global) {
-	rootCmd.AddCommand(run.Command(sess))
-	rootCmd.AddCommand(ls.Command(sess))
-	rootCmd.AddCommand(rm.Command(sess))
-	rootCmd.AddCommand(start.Command(sess))
-	rootCmd.AddCommand(stop.Command(sess))
-	rootCmd.AddCommand(rdp.Command(sess))
-	rootCmd.AddCommand(images.Command(sess))
-	rootCmd.AddCommand(dumpinfra.Command(sess))
-	rootCmd.AddCommand(exec.Command())
-	rootCmd.AddCommand(ssh.Command())
+	rootCmd.AddCommand(
+		run.Command(sess),
+		ls.Command(sess),
+		rm.Command(sess),
+		start.Command(sess),
+		stop.Command(sess),
+		rdp.Command(sess),
+		images.Command(sess),
+		dumpinfra.Command(sess),
+		exec.Command(),
+		ssh.Command(),
+	)
+
+	rootCmd.AddCommand(&cobra.Command{
+		Use:   "bash_completion",
+		Short: "Generate Bash-completion script",
+		Run: func(cmd *cobra.Command, args []string) {
+			cmd.Root().GenBashCompletion(os.Stdout)
+		},
+	})
 }
 
 func ignoreError(err error) error {
