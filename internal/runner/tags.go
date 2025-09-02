@@ -39,7 +39,9 @@ func (r InstanceRunner) setTags(ctx context.Context, in *ec2.RunInstancesInput, 
 		expanded, err := expandTagValue(v, &tagTemplateData{
 			ImageSpec: image.Spec,
 			ImageID:   *in.ImageId,
-			image:     image.Details,
+			Region:    r.sess.Region,
+
+			image: image.Details,
 
 			ctx: ctx,
 			ec2: r.sess.EC2(),
@@ -78,6 +80,7 @@ func expandTagValue(tmplText string, data *tagTemplateData) (string, error) {
 type tagTemplateData struct {
 	ImageSpec string
 	ImageID   string
+	Region    string
 
 	ctx context.Context
 	ec2 *ec2.Client
