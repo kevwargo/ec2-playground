@@ -4,6 +4,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/cloudformation"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 )
 
@@ -15,6 +16,7 @@ type Regional struct {
 	ec2 *ec2.Client
 	ssm *ssm.Client
 	cfn *cloudformation.Client
+	s3  *s3.Client
 }
 
 func (g *Global) newRegional(cfg aws.Config) *Regional {
@@ -48,4 +50,12 @@ func (s *Regional) CFN() *cloudformation.Client {
 	}
 
 	return s.cfn
+}
+
+func (s *Regional) S3() *s3.Client {
+	if s.s3 == nil {
+		s.s3 = s3.NewFromConfig(s.cfg)
+	}
+
+	return s.s3
 }

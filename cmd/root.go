@@ -14,6 +14,7 @@ import (
 	"kevwargo/ec2-playground/cmd/rdp"
 	"kevwargo/ec2-playground/cmd/rm"
 	"kevwargo/ec2-playground/cmd/run"
+	"kevwargo/ec2-playground/cmd/s3"
 	"kevwargo/ec2-playground/cmd/ssh"
 	"kevwargo/ec2-playground/cmd/start"
 	"kevwargo/ec2-playground/cmd/stop"
@@ -60,6 +61,7 @@ func addCommands(rootCmd *cobra.Command, sess *session.Global) {
 		dumpinfra.Command(sess),
 		exec.Command(),
 		ssh.Command(),
+		s3.Command(sess),
 	)
 
 	rootCmd.AddCommand(&cobra.Command{
