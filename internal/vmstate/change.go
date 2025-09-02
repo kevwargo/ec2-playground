@@ -28,29 +28,33 @@ func BuildCommand(
 	var (
 		dumpFormat config.VMFormat
 		cmd        cobra.Command
+		matchNames []string
 	)
 
 	cmd.RunE = func(c *cobra.Command, _ []string) error {
 		return changeState(c.Context(), changeStateInput{
-			session: sess,
-			op:      op,
-			tmpl:    dumpFormat.Template(),
+			session:    sess,
+			op:         op,
+			tmpl:       dumpFormat.Template(),
+			matchNames: matchNames,
 		})
 	}
 
 	cmd.Flags().VarP(&dumpFormat, "format", "f", "Instance format")
+	cmd.Flags().StringArrayVarP(&matchNames, "name-filter", "N", nil, "Simple case-insensitive matching by instance name")
 
 	return &cmd
 }
 
 type changeStateInput struct {
-	session *session.Global
-	op      func(context.Context, *ec2.Client, []string) ([]types.InstanceStateChange, error)
-	tmpl    *template.Template
+	session    *session.Global
+	op         func(context.Context, *ec2.Client, []string) ([]types.InstanceStateChange, error)
+	tmpl       *template.Template
+	matchNames []string
 }
 
 func changeState(ctx context.Context, in changeStateInput) error {
-	all, err := listVMs(ctx, in.session, in.tmpl)
+	all, err := listVMs(ctx, in)
 	if err != nil {
 		return err
 	}
@@ -84,12 +88,12 @@ func changeState(ctx context.Context, in changeStateInput) error {
 	})
 }
 
-func listVMs(ctx context.Context, cfg *session.Global, tmpl *template.Template) (map[string][]vmformat.VM, error) {
+func listVMs(ctx context.Context, in changeStateInput) (map[string][]vmformat.VM, error) {
 	var vmLock sync.Mutex
 	all := make(map[string][]vmformat.VM)
 
-	if err := cfg.Run(ctx, func(ctx context.Context, s *session.Regional) error {
-		vms, err := lister.New(s, tmpl).ListVMs(ctx)
+	if err := in.session.Run(ctx, func(ctx context.Context, s *session.Regional) error {
+		vms, err := lister.New(s, in.tmpl).ListVMs(ctx, in.matchNames)
 		if err != nil {
 			return err
 		}
