@@ -152,11 +152,13 @@ func (r Resolver) searchImages(ctx context.Context, names []string) ([]Image, er
 }
 
 var builtinParams = map[string]string{
-	"amazon": "/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2",
-	"win22":  "/aws/service/ami-windows-latest/Windows_Server-2022-English-Full-Base",
-	"win19":  "/aws/service/ami-windows-latest/Windows_Server-2019-English-Full-Base",
-	"win16":  "/aws/service/ami-windows-latest/Windows_Server-2016-English-Full-Base",
-	"win12":  "/aws/service/ami-windows-latest/Windows_Server-2012-R2_RTM-English-64Bit-Base",
+	"amzn2":      "/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2",
+	"al2023":     "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64",
+	"al2023-min": "/aws/service/ami-amazon-linux-latest/al2023-ami-minimal-kernel-default-x86_64",
+	"win22":      "/aws/service/ami-windows-latest/Windows_Server-2022-English-Full-Base",
+	"win19":      "/aws/service/ami-windows-latest/Windows_Server-2019-English-Full-Base",
+	"win16":      "/aws/service/ami-windows-latest/Windows_Server-2016-English-Full-Base",
+	"win12":      "/aws/service/ami-windows-latest/Windows_Server-2012-R2_RTM-English-64Bit-Base",
 }
 
 var amiRegex = regexp.MustCompile("^ami-([0-9a-f]{9})?([0-9a-f]{8})$")
