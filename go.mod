@@ -11,7 +11,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.82.0
 	github.com/aws/aws-sdk-go-v2/service/ssm v1.50.0
 	github.com/aws/smithy-go v1.22.4
-	github.com/spf13/cobra v1.8.0
+	github.com/spf13/cobra v1.10.1
 )
 
 require (
@@ -31,5 +31,5 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/sts v1.28.6 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
-	github.com/spf13/pflag v1.0.5 // indirect
+	github.com/spf13/pflag v1.0.9 // indirect
 )
