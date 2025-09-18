@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
@@ -28,6 +29,7 @@ func (r InstanceRunner) setProfile(ctx context.Context, in *ec2.RunInstancesInpu
 			builder := profileBuilder{
 				session:       r.sess.Global,
 				iam:           iamClient,
+				region:        r.sess.Region,
 				userPolicies:  r.cfg.Policies,
 				defaultPolicy: resources.InstancePolicy,
 				infraName:     r.cfg.Infra.StackName,
@@ -58,20 +60,16 @@ func (r InstanceRunner) setProfile(ctx context.Context, in *ec2.RunInstancesInpu
 type profileBuilder struct {
 	session       *session.Global
 	iam           *iam.Client
+	region        string
 	userPolicies  []string
 	defaultPolicy string
 	infraName     string
 }
 
 func (b *profileBuilder) buildProfile(ctx context.Context) (string, error) {
-	policiesHash, err := b.getPolicyHash(ctx, b.userPolicies)
-	if err != nil {
-		return "", err
-	}
+	policiesHash := b.computePoliciesHash()
 
-	b.session.Log("hash(%s) = %s", b.userPolicies, policiesHash)
-
-	profileName := fmt.Sprintf(instanceProfileFmt, b.infraName, policiesHash)
+	profileName := fmt.Sprintf(instanceProfileFmt, b.region, policiesHash)
 	if exists, err := b.profileExists(ctx, profileName); exists {
 		return profileName, nil
 	} else if err != nil {
@@ -122,7 +120,7 @@ type principal struct {
 }
 
 func (b *profileBuilder) createRole(ctx context.Context, policyHash string) (string, error) {
-	roleName := fmt.Sprintf(instanceRoleFmt, b.infraName, policyHash)
+	roleName := fmt.Sprintf(instanceRoleFmt, b.region, policyHash)
 
 	assumeDocument, err := json.Marshal(policyDocument{
 		Version: "2012-10-17",
@@ -194,34 +192,27 @@ func (b *profileBuilder) createProfile(ctx context.Context, profileName, roleNam
 	return nil
 }
 
-func (b *profileBuilder) getPolicyHash(ctx context.Context, policies []string) (string, error) {
+func (b *profileBuilder) computePoliciesHash() string {
 	h := md5.New()
 
+	policies := []string{b.defaultPolicy, ssmPolicy}
+	policies = append(policies, b.userPolicies...)
+	slices.Sort(policies)
+
 	for _, policy := range policies {
-		policyResp, err := b.iam.GetPolicy(ctx, &iam.GetPolicyInput{PolicyArn: &policy})
-		if err != nil {
-			return "", err
-		}
-
-		versionResp, err := b.iam.GetPolicyVersion(ctx, &iam.GetPolicyVersionInput{
-			PolicyArn: &policy,
-			VersionId: policyResp.Policy.DefaultVersionId,
-		})
-		if err != nil {
-			return "", err
-		}
-
-		h.Write([]byte(*versionResp.PolicyVersion.Document))
+		h.Write([]byte(policy))
 	}
 
-	policyHash := base64.RawURLEncoding.EncodeToString(h.Sum(nil))
+	policiesHash := base64.RawURLEncoding.EncodeToString(h.Sum(nil))
 
-	return policyHash, nil
+	b.session.Log("hash(%s) = %s", policies, policiesHash)
+
+	return policiesHash
 }
 
 const (
 	ssmPolicy = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
 
-	instanceProfileFmt = "%s-InstanceProfile-%s"
-	instanceRoleFmt    = "%s-InstanceRole-%s"
+	instanceProfileFmt = "ec2pg-InstanceProfile-%s-%s"
+	instanceRoleFmt    = "ec2pg-InstanceRole-%s-%s"
 )

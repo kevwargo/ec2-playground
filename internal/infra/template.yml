@@ -10,6 +10,9 @@ Parameters:
     Type: String
     Default: 10.0.0.0/20
 
+  BucketNameBase:
+    Type: String
+
 Conditions:
   CreateVPC: !Equals
     - !Ref DefaultVPC
@@ -118,10 +121,13 @@ Resources:
 
   Bucket:
     Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub '${BucketNameBase}-${AWS::Region}'
 
   InstancePolicy:
     Type: AWS::IAM::ManagedPolicy
     Properties:
+      ManagedPolicyName: !Sub '${AWS::StackName}-InstancePolicy-${AWS::Region}'
       PolicyDocument:
         Version: '2012-10-17'
         Statement:
@@ -148,6 +154,7 @@ Resources:
   InstanceRole:
     Type: AWS::IAM::Role
     Properties:
+      RoleName: !Sub '${AWS::StackName}-InstanceRole-${AWS::Region}'
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
@@ -162,6 +169,7 @@ Resources:
   InstanceProfile:
     Type: AWS::IAM::InstanceProfile
     Properties:
+      InstanceProfileName: !Sub '${AWS::StackName}-InstanceProfile-${AWS::Region}'
       Roles:
         - !Ref InstanceRole
 

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/cloudformation"
@@ -29,11 +30,15 @@ var (
 	errMsgInvalidState     = regexp.MustCompile("Stack:(.*) is in ([A-Z_]+) state and can not be updated.")
 
 	noUpdates = errors.New("No updates are to be performed.")
+
+	s3BucketInvalidChars = regexp.MustCompile("^[^a-z0-9]|[^a-z0-9.-]+|[^a-z0-9]$")
+	s3BucketMultiPeriod  = regexp.MustCompile(`\.\.+`)
 )
 
 const (
 	errCodeValidation   = "ValidationError"
-	defaultVPCParamName = "DefaultVPC"
+	paramNameDefaultVPC = "DefaultVPC"
+	paramNameBucketName = "BucketNameBase"
 )
 
 type Resources struct {
@@ -123,7 +128,7 @@ func (f Fetcher) deploy(ctx context.Context) error {
 func (f Fetcher) tryStartUpdate(ctx context.Context, params []types.Parameter) (string, error) {
 	resp, err := f.session.CFN().UpdateStack(ctx, &cloudformation.UpdateStackInput{
 		StackName:    &f.stackName,
-		Capabilities: []types.Capability{types.CapabilityCapabilityIam},
+		Capabilities: []types.Capability{types.CapabilityCapabilityNamedIam},
 		TemplateBody: &templateBody,
 		Parameters:   params,
 	})
@@ -204,16 +209,28 @@ func (f Fetcher) startCreate(ctx context.Context, params []types.Parameter) (str
 
 func (f Fetcher) prepareStackParams(ctx context.Context) ([]types.Parameter, error) {
 	defaultVPC, err := f.getDefaultVPC(ctx)
-	if defaultVPC == "" {
+	if err != nil {
 		return nil, err
 	}
 
-	return []types.Parameter{
+	bucketNameBase := s3BucketInvalidChars.ReplaceAllLiteralString(strings.ToLower(f.stackName), "")
+	bucketNameBase = s3BucketMultiPeriod.ReplaceAllLiteralString(bucketNameBase, ".")
+
+	params := []types.Parameter{
 		{
-			ParameterKey:   aws.String(defaultVPCParamName),
-			ParameterValue: &defaultVPC,
+			ParameterKey:   aws.String(paramNameBucketName),
+			ParameterValue: &bucketNameBase,
 		},
-	}, nil
+	}
+
+	if defaultVPC != "" {
+		params = append(params, types.Parameter{
+			ParameterKey:   aws.String(paramNameDefaultVPC),
+			ParameterValue: &defaultVPC,
+		})
+	}
+
+	return params, nil
 }
 
 func (f Fetcher) getDefaultVPC(ctx context.Context) (string, error) {
