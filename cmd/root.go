@@ -18,6 +18,7 @@ import (
 	"kevwargo/ec2-playground/cmd/ssh"
 	"kevwargo/ec2-playground/cmd/start"
 	"kevwargo/ec2-playground/cmd/stop"
+	"kevwargo/ec2-playground/cmd/tag"
 	"kevwargo/ec2-playground/internal/session"
 )
 
@@ -56,6 +57,7 @@ func addCommands(rootCmd *cobra.Command, sess *session.Global) {
 		rm.Command(sess),
 		start.Command(sess),
 		stop.Command(sess),
+		tag.Command(sess),
 		rdp.Command(sess),
 		images.Command(sess),
 		dumpinfra.Command(sess),
