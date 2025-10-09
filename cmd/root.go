@@ -61,7 +61,7 @@ func addCommands(rootCmd *cobra.Command, sess *session.Global) {
 		rdp.Command(sess),
 		images.Command(sess),
 		dumpinfra.Command(sess),
-		exec.Command(),
+		exec.Command(sess),
 		ssh.Command(),
 		s3.Command(sess),
 	)
