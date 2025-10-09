@@ -30,8 +30,11 @@ func Command(sess *session.Global) *cobra.Command {
 	return cmd
 }
 
-func apply(ctx context.Context, ec2Client *ec2.Client, ids []string) ([]types.InstanceStateChange, error) {
-	var errs []error
+func apply(ctx context.Context, sess *session.Regional, ids []string) ([]types.InstanceStateChange, error) {
+	var (
+		ec2Client = sess.EC2()
+		errs      []error
+	)
 
 	if len(tagsSet) > 0 {
 		_, err := ec2Client.CreateTags(ctx, &ec2.CreateTagsInput{

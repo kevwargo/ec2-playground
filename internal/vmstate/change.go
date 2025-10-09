@@ -11,7 +11,6 @@ import (
 	"sync"
 	"text/template"
 
-	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	"github.com/spf13/cobra"
 
@@ -21,10 +20,9 @@ import (
 	"kevwargo/ec2-playground/internal/vmformat"
 )
 
-func BuildCommand(
-	sess *session.Global,
-	op func(context.Context, *ec2.Client, []string) ([]types.InstanceStateChange, error),
-) *cobra.Command {
+type Operation func(context.Context, *session.Regional, []string) ([]types.InstanceStateChange, error)
+
+func BuildCommand(sess *session.Global, op Operation) *cobra.Command {
 	var (
 		dumpFormat config.VMFormat
 		cmd        cobra.Command
@@ -48,7 +46,7 @@ func BuildCommand(
 
 type changeStateInput struct {
 	session    *session.Global
-	op         func(context.Context, *ec2.Client, []string) ([]types.InstanceStateChange, error)
+	op         Operation
 	tmpl       *template.Template
 	matchNames []string
 }
@@ -75,7 +73,7 @@ func changeState(ctx context.Context, in changeStateInput) error {
 			ids = append(ids, *vm.InstanceId)
 		}
 
-		changes, err := in.op(ctx, s.EC2(), ids)
+		changes, err := in.op(ctx, s, ids)
 		if err != nil {
 			return err
 		}
