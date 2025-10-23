@@ -42,11 +42,14 @@ const (
 )
 
 type Resources struct {
-	SecurityGroup   string `json:"SecurityGroup"`
-	Subnet          string `json:"Subnet"`
-	InstancePolicy  string `json:"InstancePolicy"`
-	InstanceProfile string `json:"InstanceProfile"`
-	Bucket          string `json:"Bucket"`
+	SecurityGroup        string `json:"SecurityGroup"`
+	Subnet               string `json:"Subnet"`
+	InstancePolicy       string `json:"InstancePolicy"`
+	InstanceProfile      string `json:"InstanceProfile"`
+	Bucket               string `json:"Bucket"`
+	CmdNotification      string `json:"CmdNotification"`
+	CmdNotificationQueue string `json:"CmdNotificationQueue"`
+	CmdNotificationRole  string `json:"CmdNotificationRole"`
 }
 
 type Fetcher struct {

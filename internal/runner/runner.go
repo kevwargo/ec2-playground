@@ -127,7 +127,7 @@ func (r InstanceRunner) buildParams(ctx context.Context, resources infra.Resourc
 	}
 	in.UserData = userData
 
-	resolvedImages, err := r.imageResolver.Resolve(ctx, r.cfg.Images)
+	resolvedImages, err := r.imageResolver.Resolve(ctx, images.ResolveInput{Patterns: r.cfg.Images})
 	if err != nil {
 		return runParams{}, err
 	}

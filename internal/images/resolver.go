@@ -26,13 +26,19 @@ func NewResolver(ssmClient *ssm.Client, ec2Client *ec2.Client) Resolver {
 	}
 }
 
-func (r Resolver) Resolve(ctx context.Context, patterns []string) ([]Image, error) {
+type ResolveInput struct {
+	Patterns          []string
+	IncludeDisabled   bool
+	IncludeDeprecated bool
+}
+
+func (r Resolver) Resolve(ctx context.Context, in ResolveInput) ([]Image, error) {
 	var (
 		resolvedImages []Image
 		amiNames       []string
 	)
 
-	for _, p := range patterns {
+	for _, p := range in.Patterns {
 		if amiRegex.MatchString(p) {
 			resolvedImages = append(resolvedImages, Image{
 				Spec: p,
@@ -56,16 +62,21 @@ func (r Resolver) Resolve(ctx context.Context, patterns []string) ([]Image, erro
 		amiNames = append(amiNames, p)
 	}
 
-	foundImages, err := r.searchImages(ctx, amiNames)
-	if err != nil {
-		return nil, err
+	if len(amiNames) > 0 {
+		in.Patterns = amiNames
+		foundImages, err := r.searchImages(ctx, in)
+		if err != nil {
+			return nil, err
+		}
+
+		resolvedImages = append(resolvedImages, foundImages...)
 	}
 
-	return append(resolvedImages, foundImages...), nil
+	return resolvedImages, nil
 }
 
-func (r Resolver) ResolveWithDetails(ctx context.Context, patterns []string) ([]Image, error) {
-	resolved, err := r.Resolve(ctx, patterns)
+func (r Resolver) ResolveWithDetails(ctx context.Context, in ResolveInput) ([]Image, error) {
+	resolved, err := r.Resolve(ctx, in)
 	if err != nil {
 		return nil, err
 	}
@@ -122,17 +133,25 @@ func (r Resolver) resolveSSMParam(ctx context.Context, name string) (*string, er
 	return nil, nil
 }
 
-func (r Resolver) searchImages(ctx context.Context, names []string) ([]Image, error) {
+func (r Resolver) searchImages(ctx context.Context, in ResolveInput) ([]Image, error) {
 	var images []Image
 
-	paginator := ec2.NewDescribeImagesPaginator(r.ec2Client, &ec2.DescribeImagesInput{
+	params := ec2.DescribeImagesInput{
 		Filters: []types.Filter{
 			{
 				Name:   aws.String("name"),
-				Values: names,
+				Values: in.Patterns,
 			},
 		},
-	})
+	}
+	if in.IncludeDeprecated {
+		params.IncludeDeprecated = aws.Bool(true)
+	}
+	if in.IncludeDisabled {
+		params.IncludeDisabled = aws.Bool(true)
+	}
+
+	paginator := ec2.NewDescribeImagesPaginator(r.ec2Client, &params)
 	for paginator.HasMorePages() {
 		page, err := paginator.NextPage(ctx)
 		if err != nil {
