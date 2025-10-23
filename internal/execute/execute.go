@@ -2,18 +2,19 @@ package execute
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
-	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
-	"github.com/aws/aws-sdk-go-v2/service/ssm/types"
+	ssmtypes "github.com/aws/aws-sdk-go-v2/service/ssm/types"
 
 	"kevwargo/ec2-playground/internal/config"
 	"kevwargo/ec2-playground/internal/infra"
@@ -29,7 +30,7 @@ type ExecuteInput struct {
 func Execute(ctx context.Context, in ExecuteInput) error {
 	resources, err := infra.NewFetcher(in.Sess, config.InfraConfig{
 		StackName:  infra.DefaultStackName,
-		SkipDeploy: false,
+		SkipDeploy: true,
 	}).Fetch(ctx)
 	if err != nil {
 		return err
@@ -41,6 +42,12 @@ func Execute(ctx context.Context, in ExecuteInput) error {
 		OutputS3BucketName: &resources.Bucket,
 		OutputS3KeyPrefix:  aws.String("ssm-command-logs"),
 		Parameters:         in.Cfg.Params,
+		NotificationConfig: &ssmtypes.NotificationConfig{
+			NotificationArn:    &resources.CmdNotification,
+			NotificationType:   ssmtypes.NotificationTypeInvocation,
+			NotificationEvents: []ssmtypes.NotificationEvent{ssmtypes.NotificationEventAll},
+		},
+		ServiceRoleArn: &resources.CmdNotificationRole,
 	})
 	if err != nil {
 		return err
@@ -51,34 +58,39 @@ func Execute(ctx context.Context, in ExecuteInput) error {
 	return watchCommand(ctx, watchInput{
 		sess:       in.Sess,
 		cmd:        resp.Command,
+		queue:      resources.CmdNotificationQueue,
 		outputsDir: in.Cfg.OutputsDir,
 	})
 }
 
 type watchInput struct {
 	sess       *session.Regional
-	cmd        *types.Command
+	cmd        *ssmtypes.Command
+	queue      string
 	outputsDir string
 }
 
 func watchCommand(ctx context.Context, in watchInput) error {
-	var state instanceStatuses
+	state := make(commandState)
 
 	for !state.allFinished() {
-		time.Sleep(commandCheckInterval)
-
-		resp, err := in.sess.SSM().ListCommandInvocations(ctx, &ssm.ListCommandInvocationsInput{
-			CommandId: in.cmd.CommandId,
-		})
+		notifications, err := pollNotifications(ctx, in)
 		if err != nil {
-			return fmt.Errorf("listing SSM command %q invocations: %w", *in.cmd.CommandId, err)
+			return err
 		}
 
-		for _, change := range state.getChanges(resp.CommandInvocations) {
+		if len(notifications) == 0 {
+			notifications, err = checkNotifications(ctx, in)
+			if err != nil {
+				return err
+			}
+		}
+
+		for _, change := range state.applyChanges(notifications) {
 			if change.prev != nil {
-				in.sess.Log("%s: %s -> %s", change.instanceID, change.prev, change.current)
+				in.sess.Log("%s: %s -> %s (%s)", change.instanceID, change.prev, change.current, change.source)
 			} else {
-				in.sess.Log("%s: %s", change.instanceID, change.current)
+				in.sess.Log("%s: %s (%s)", change.instanceID, change.current, change.source)
 			}
 
 			if !change.current.isPending() {
@@ -97,10 +109,79 @@ func watchCommand(ctx context.Context, in watchInput) error {
 	return nil
 }
 
-type instanceStatuses map[string]instanceStatus
+type commandNotification struct {
+	CommandID      string
+	InstanceID     string
+	Status         ssmtypes.CommandInvocationStatus
+	DetailedStatus *string
+
+	source string
+}
+
+// even if error occurs, may return non-empty list of notifications
+func pollNotifications(ctx context.Context, in watchInput) ([]commandNotification, error) {
+	resp, err := in.sess.SQS().ReceiveMessage(ctx, &sqs.ReceiveMessageInput{
+		QueueUrl:        &in.queue,
+		WaitTimeSeconds: 20,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("sqs:ReceiveMessage: %w", err)
+	}
+
+	var notifications []commandNotification
+
+	for _, msg := range resp.Messages {
+		var notification commandNotification
+		if json.Unmarshal([]byte(*msg.Body), &notification) != nil {
+			continue
+		}
+
+		if notification.CommandID != *in.cmd.CommandId {
+			continue
+		}
+
+		notification.source = "sqs"
+		notifications = append(notifications, notification)
+
+		if _, err := in.sess.SQS().DeleteMessage(ctx, &sqs.DeleteMessageInput{
+			QueueUrl:      &in.queue,
+			ReceiptHandle: msg.ReceiptHandle,
+		}); err != nil {
+			return notifications, fmt.Errorf("sqs:DeleteMessage(%q, %q): %w", *msg.MessageId, *msg.ReceiptHandle, err)
+		}
+	}
+
+	return notifications, nil
+}
+
+func checkNotifications(ctx context.Context, in watchInput) ([]commandNotification, error) {
+	resp, err := in.sess.SSM().ListCommandInvocations(ctx, &ssm.ListCommandInvocationsInput{
+		CommandId: in.cmd.CommandId,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("listing SSM command %q invocations: %w", *in.cmd.CommandId, err)
+	}
+
+	var notifications []commandNotification
+
+	for _, inv := range resp.CommandInvocations {
+		notifications = append(notifications, commandNotification{
+			CommandID:      *inv.CommandId,
+			InstanceID:     *inv.InstanceId,
+			Status:         inv.Status,
+			DetailedStatus: inv.StatusDetails,
+
+			source: "ssm",
+		})
+	}
+
+	return notifications, nil
+}
+
+type commandState map[string]instanceStatus
 
 type instanceStatus struct {
-	status  types.CommandInvocationStatus
+	status  ssmtypes.CommandInvocationStatus
 	details *string
 }
 
@@ -118,12 +199,13 @@ func (s instanceStatus) isPending() bool {
 }
 
 type statusChange struct {
+	source     string
 	instanceID string
 	current    instanceStatus
 	prev       *instanceStatus
 }
 
-func (is instanceStatuses) allFinished() bool {
+func (is commandState) allFinished() bool {
 	if len(is) == 0 {
 		return false
 	}
@@ -137,30 +219,28 @@ func (is instanceStatuses) allFinished() bool {
 	return true
 }
 
-func (is *instanceStatuses) getChanges(invocations []types.CommandInvocation) (changes []statusChange) {
-	for _, inv := range invocations {
+func (s commandState) applyChanges(notifications []commandNotification) (changes []statusChange) {
+	for _, notification := range notifications {
 		status := instanceStatus{
-			status:  inv.Status,
-			details: inv.StatusDetails,
+			status:  notification.Status,
+			details: notification.DetailedStatus,
 		}
 
-		prev, ok := (*is)[*inv.InstanceId]
+		prev, ok := s[notification.InstanceID]
 		if !ok {
-			if *is == nil {
-				*is = make(instanceStatuses)
-			}
-
-			(*is)[*inv.InstanceId] = status
+			s[notification.InstanceID] = status
 			changes = append(changes, statusChange{
-				instanceID: *inv.InstanceId,
+				instanceID: notification.InstanceID,
 				current:    status,
+				source:     notification.source,
 			})
-		} else if prev.status != inv.Status {
-			(*is)[*inv.InstanceId] = status
+		} else if prev.status != notification.Status {
+			s[notification.InstanceID] = status
 			changes = append(changes, statusChange{
-				instanceID: *inv.InstanceId,
+				instanceID: notification.InstanceID,
 				current:    status,
 				prev:       &prev,
+				source:     notification.source,
 			})
 		}
 	}
@@ -170,7 +250,7 @@ func (is *instanceStatuses) getChanges(invocations []types.CommandInvocation) (c
 
 type downloadAllInput struct {
 	sess       *session.Regional
-	cmd        *types.Command
+	cmd        *ssmtypes.Command
 	instanceID string
 	outputsDir string
 }
@@ -255,11 +335,9 @@ func downloadSingleOutput(ctx context.Context, in downloadSingleInput) error {
 	return nil
 }
 
-const commandCheckInterval = 10 * time.Second
-
-var pendingStatuses = []types.CommandInvocationStatus{
-	types.CommandInvocationStatusPending,
-	types.CommandInvocationStatusInProgress,
-	types.CommandInvocationStatusDelayed,
-	types.CommandInvocationStatusCancelling,
+var pendingStatuses = []ssmtypes.CommandInvocationStatus{
+	ssmtypes.CommandInvocationStatusPending,
+	ssmtypes.CommandInvocationStatusInProgress,
+	ssmtypes.CommandInvocationStatusDelayed,
+	ssmtypes.CommandInvocationStatusCancelling,
 }

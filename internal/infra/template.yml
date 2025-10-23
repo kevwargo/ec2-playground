@@ -173,6 +173,58 @@ Resources:
       Roles:
         - !Ref InstanceRole
 
+  CmdNotification:
+    Type: AWS::SNS::Topic
+
+  CmdNotificationRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ssm.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Policies:
+        - PolicyName: publish-sns
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: sns:Publish
+                Resource: !Ref CmdNotification
+
+  CmdNotificationSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      Endpoint: !GetAtt CmdNotificationQueue.Arn
+      Protocol: sqs
+      RawMessageDelivery: true
+      TopicArn: !Ref CmdNotification
+    DependsOn:
+      - CmdNotificationQueuePolicy
+
+  CmdNotificationQueue:
+    Type: AWS::SQS::Queue
+
+  CmdNotificationQueuePolicy:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      PolicyDocument:
+        Statement:
+          - Effect: Allow
+            Action: sqs:SendMessage
+            Principal:
+              Service: sns.amazonaws.com
+            Resource: !GetAtt CmdNotificationQueue.Arn
+            Condition:
+              ArnEquals:
+                "aws:SourceArn": !Ref CmdNotification
+      Queues:
+        - !Ref CmdNotificationQueue
+
 Outputs:
   SecurityGroup:
     Value: !Ref SecurityGroup
@@ -189,3 +241,12 @@ Outputs:
 
   Bucket:
     Value: !Ref Bucket
+
+  CmdNotification:
+    Value: !Ref CmdNotification
+
+  CmdNotificationQueue:
+    Value: !Ref CmdNotificationQueue
+
+  CmdNotificationRole:
+    Value: !GetAtt CmdNotificationRole.Arn
