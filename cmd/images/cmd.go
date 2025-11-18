@@ -10,10 +10,7 @@ import (
 )
 
 func Command(sess *session.Global) *cobra.Command {
-	var (
-		includeDeprecated bool
-		includeDisabled   bool
-	)
+	var input images.ResolveInput
 
 	cmd := &cobra.Command{
 		Use:   "images NAME",
@@ -21,12 +18,9 @@ func Command(sess *session.Global) *cobra.Command {
 		Args:  cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return sess.Run(cmd.Context(), func(ctx context.Context, r *session.Regional) error {
+				input.Patterns = args
 				resolver := images.NewResolver(r.SSM(), r.EC2())
-				resolvedImages, err := resolver.ResolveWithDetails(ctx, images.ResolveInput{
-					Patterns:          args,
-					IncludeDeprecated: includeDeprecated,
-					IncludeDisabled:   includeDisabled,
-				})
+				resolvedImages, err := resolver.ResolveWithDetails(ctx, input)
 				if err != nil {
 					return err
 				}
@@ -40,8 +34,8 @@ func Command(sess *session.Global) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().BoolVar(&includeDeprecated, "deprecated", false, "Include deprecated images when searching by name")
-	cmd.Flags().BoolVar(&includeDisabled, "disabled", false, "Include disabled images when searching by name")
+	cmd.Flags().BoolVar(&input.IncludeDeprecated, "deprecated", false, "Include deprecated images when searching by name")
+	cmd.Flags().BoolVar(&input.IncludeDisabled, "disabled", false, "Include disabled images when searching by name")
 
 	return cmd
 }
