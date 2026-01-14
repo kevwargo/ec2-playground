@@ -12,6 +12,7 @@ type RunConfig struct {
 	SkipPublicIPv4   bool
 	UserData         string
 	BlockMappings    []string
+	AllowIMDSv1      bool
 	Infra            InfraConfig
 	DumpFormat       VMFormat
 	DryRun           bool

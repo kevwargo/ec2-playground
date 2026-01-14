@@ -170,6 +170,10 @@ func (r InstanceRunner) createBasicInput(resources infra.Resources) ec2.RunInsta
 		},
 	}
 
+	if r.cfg.AllowIMDSv1 {
+		in.MetadataOptions.HttpTokens = types.HttpTokensStateOptional
+	}
+
 	if resources.Subnet != "" {
 		in.NetworkInterfaces = []types.InstanceNetworkInterfaceSpecification{
 			{
