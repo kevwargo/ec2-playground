@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"regexp"
+	"strconv"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -69,6 +71,10 @@ type runParams struct {
 }
 
 func (r InstanceRunner) runInstances(ctx context.Context, input ec2.RunInstancesInput, waitForProfile bool) error {
+	if r.cfg.Verbose {
+		r.dumpParams(input)
+	}
+
 	resp, err := r.sess.EC2().RunInstances(ctx, &input)
 
 	if waitForProfile {
@@ -118,6 +124,10 @@ func (r InstanceRunner) buildParams(ctx context.Context, resources infra.Resourc
 	}
 
 	if err := r.setKeyPair(ctx, &in); err != nil {
+		return runParams{}, err
+	}
+
+	if err := r.setBlockMappings(&in); err != nil {
 		return runParams{}, err
 	}
 
@@ -176,7 +186,28 @@ func (r InstanceRunner) createBasicInput(resources infra.Resources) ec2.RunInsta
 	return in
 }
 
+func (r InstanceRunner) setBlockMappings(in *ec2.RunInstancesInput) error {
+	for _, spec := range r.cfg.BlockMappings {
+		m := rxBlockDeviceMapping.FindStringSubmatch(spec)
+		if m == nil {
+			return fmt.Errorf("invalid block-device-mapping: %q", spec)
+		}
+
+		size, _ := strconv.Atoi(m[2])
+		in.BlockDeviceMappings = append(in.BlockDeviceMappings, types.BlockDeviceMapping{
+			DeviceName: &m[1],
+			Ebs: &types.EbsBlockDevice{
+				VolumeSize: aws.Int32(int32(size)),
+			},
+		})
+	}
+
+	return nil
+}
+
 const (
 	errProfileInvalidMsgTmpl = "Value (%s) for parameter iamInstanceProfile.name is invalid. Invalid IAM Instance Profile name"
 	errProfileInvalidCode    = "InvalidParameterValue"
 )
+
+var rxBlockDeviceMapping = regexp.MustCompile("([a-z0-9/]+)=([0-9]+)")

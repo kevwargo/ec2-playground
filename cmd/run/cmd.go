@@ -40,16 +40,18 @@ func Command(sess *session.Global) *cobra.Command {
 
 	f.StringVarP(&cfg.KeyPair, flagKeyPair, "k", "", "Existing EC2 key pair")
 	f.StringVarP(&cfg.SSHPublicKeyFile, flagSSHPublicKeyFile, "s", "", "A path to the SSH public key file which will be imported and attached to the instance")
-	f.BoolVar(&cfg.SkipPublicIPv4, "skip-public-ipv4", false, "Don't assign an IPv4 address to the instance")
 	cmd.MarkFlagsMutuallyExclusive(flagKeyPair, flagSSHPublicKeyFile)
 
+	f.BoolVar(&cfg.SkipPublicIPv4, "skip-public-ipv4", false, "Don't assign an IPv4 address to the instance")
 	f.StringVarP(&cfg.UserData, "user-data", "u", "", "The script file containing user-data")
+	f.StringArrayVarP(&cfg.BlockMappings, "block-mappings", "B", nil, "Additional block device mappings")
 
 	f.StringVar(&cfg.Infra.StackName, "infra-stack", infra.DefaultStackName, "Infra stack name")
 	f.BoolVar(&cfg.Infra.SkipDeploy, "skip-infra-deploy", false, "Don't attempt to deploy the infra stack")
 
 	f.VarP(&cfg.DumpFormat, "dump-format", "f", "Format for printing new instances")
 	f.BoolVarP(&cfg.DryRun, "dry-run", "d", false, "Dry run operation")
+	f.BoolVarP(&cfg.Verbose, "verbose", "v", false, "Dump the ec2.RunInstances request parameters")
 
 	return cmd
 }

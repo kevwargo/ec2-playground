@@ -11,7 +11,9 @@ type RunConfig struct {
 	SSHPublicKeyFile string
 	SkipPublicIPv4   bool
 	UserData         string
+	BlockMappings    []string
 	Infra            InfraConfig
 	DumpFormat       VMFormat
 	DryRun           bool
+	Verbose          bool
 }
