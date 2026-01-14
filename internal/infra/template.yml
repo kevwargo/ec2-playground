@@ -122,7 +122,7 @@ Resources:
   Bucket:
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: !Sub '${BucketNameBase}-${AWS::Region}'
+      BucketName: !Sub '${BucketNameBase}-${AWS::AccountId}-${AWS::Region}'
 
   InstancePolicy:
     Type: AWS::IAM::ManagedPolicy
