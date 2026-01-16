@@ -131,6 +131,10 @@ func (r InstanceRunner) buildParams(ctx context.Context, resources infra.Resourc
 		return runParams{}, err
 	}
 
+	if r.cfg.TerminateOnShutdown {
+		in.InstanceInitiatedShutdownBehavior = types.ShutdownBehaviorTerminate
+	}
+
 	userData, err := userdata.Build(r.cfg.UserData)
 	if err != nil {
 		return runParams{}, err
