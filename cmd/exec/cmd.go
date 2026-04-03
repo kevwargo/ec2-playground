@@ -6,18 +6,18 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	"github.com/spf13/cobra"
 
-	"kevwargo/ec2-playground/internal/execute"
 	"kevwargo/ec2-playground/internal/session"
+	"kevwargo/ec2-playground/internal/ssmcmd"
 	"kevwargo/ec2-playground/internal/vmstate"
 )
 
 func Command(sess *session.Global) *cobra.Command {
-	var cfg execute.Config
+	var cfg ssmcmd.Config
 
 	cmd := vmstate.BuildCommand(
 		sess,
 		func(ctx context.Context, sess *session.Regional, instanceIds []string) ([]types.InstanceStateChange, error) {
-			return nil, execute.Execute(ctx, execute.ExecuteInput{
+			return nil, ssmcmd.Execute(ctx, ssmcmd.ExecuteInput{
 				Cfg:         cfg,
 				Sess:        sess,
 				InstanceIds: instanceIds,
@@ -28,8 +28,10 @@ func Command(sess *session.Global) *cobra.Command {
 	cmd.Use = "exec"
 	cmd.Short = "Execute SSM command on EC2 instances"
 
-	cmd.Flags().StringVarP(&cfg.Document, flagDocument, "d", "", "SSM document name/ARN")
+	cmd.Flags().VarP(&cfg.Document, flagDocument, "d", "SSM document name/ARN")
 	cmd.Flags().VarP(&cfg.Params, "parameters", "p", "A list of parameters to pass to the SSM document")
+	cmd.Flags().StringVarP(&cfg.InlineScript, flagInlineScript, "c", "", "Script content passed as literal string")
+	cmd.Flags().StringVarP(&cfg.ScriptFile, flagScriptFile, "s", "", "Filename with script content")
 	cmd.Flags().StringVarP(
 		&cfg.OutputsDir,
 		"outputs-dir",
@@ -39,10 +41,13 @@ func Command(sess *session.Global) *cobra.Command {
 	)
 
 	cmd.MarkFlagRequired(flagDocument)
+	cmd.MarkFlagsMutuallyExclusive(flagInlineScript, flagScriptFile)
 
 	return cmd
 }
 
 const (
-	flagDocument = "document"
+	flagDocument     = "document"
+	flagInlineScript = "inline-script"
+	flagScriptFile   = "script-file"
 )

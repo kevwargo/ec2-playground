@@ -1,4 +1,4 @@
-package execute
+package ssmcmd
 
 import (
 	"context"
@@ -28,6 +28,11 @@ type ExecuteInput struct {
 }
 
 func Execute(ctx context.Context, in ExecuteInput) error {
+	params, err := in.Cfg.BuildParams()
+	if err != nil {
+		return err
+	}
+
 	resources, err := infra.NewFetcher(in.Sess, config.InfraConfig{
 		StackName:  infra.DefaultStackName,
 		SkipDeploy: true,
@@ -37,11 +42,11 @@ func Execute(ctx context.Context, in ExecuteInput) error {
 	}
 
 	resp, err := in.Sess.SSM().SendCommand(ctx, &ssm.SendCommandInput{
-		DocumentName:       &in.Cfg.Document,
+		DocumentName:       in.Cfg.Document.Name(),
 		InstanceIds:        in.InstanceIds,
 		OutputS3BucketName: &resources.Bucket,
 		OutputS3KeyPrefix:  aws.String("ssm-command-logs"),
-		Parameters:         in.Cfg.Params,
+		Parameters:         params,
 		NotificationConfig: &ssmtypes.NotificationConfig{
 			NotificationArn:    &resources.CmdNotification,
 			NotificationType:   ssmtypes.NotificationTypeInvocation,
@@ -316,7 +321,7 @@ func downloadSingleOutput(ctx context.Context, in downloadSingleInput) error {
 	}
 	defer resp.Body.Close()
 
-	path := fmt.Sprintf("%s/%s/%s", in.outdir, in.instanceID, strings.TrimPrefix(in.key, in.prefix))
+	path := fmt.Sprintf("%s/%s/%s", in.outdir, in.instanceID, strings.TrimLeft(strings.TrimPrefix(in.key, in.prefix), "/"))
 	if err = os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return fmt.Errorf("creating dir %s: %w", filepath.Dir(path), err)
 	}
