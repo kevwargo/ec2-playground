@@ -7,43 +7,82 @@ import (
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	ssmtypes "github.com/aws/aws-sdk-go-v2/service/ssm/types"
 )
 
 type instanceData struct {
+	I      types.Instance
 	Id     string
 	Type   string
 	State  string
 	Region string
-	I      types.Instance
+	Tags   map[string]string
 
 	ctx context.Context
 
-	tags map[string]string
-
 	ssm      *ssm.Client
+	ec2      *ec2.Client
 	ssmCache *ssmCache
 	ssmInfo  *ssmtypes.InstanceInformation
+	amiCache map[string]types.Image
 }
 
 func (f Formatter) prepareInstanceData(ctx context.Context, instance types.Instance) *instanceData {
-	return &instanceData{
+	data := &instanceData{
+		I:      instance,
 		Id:     *instance.InstanceId,
 		Type:   string(instance.InstanceType),
 		State:  string(instance.State.Name),
 		Region: f.session.Region,
-		I:      instance,
+		Tags:   make(map[string]string, len(instance.Tags)),
 
 		ctx:      ctx,
 		ssm:      f.session.SSM(),
+		ec2:      f.session.EC2(),
 		ssmCache: f.ssmCache,
+		amiCache: f.amiCache,
 	}
+	for _, t := range instance.Tags {
+		data.Tags[*t.Key] = *t.Value
+	}
+
+	return data
 }
 
 func (i *instanceData) Name() string {
-	return i.Tags()["Name"]
+	return i.Tags["Name"]
+}
+
+func (i *instanceData) Image() (types.Image, error) {
+	imageID := *i.I.ImageId
+
+	if cached, ok := i.amiCache[imageID]; ok {
+		return cached, nil
+	}
+
+	resp, err := i.ec2.DescribeImages(i.ctx, &ec2.DescribeImagesInput{ImageIds: []string{imageID}})
+	if err != nil {
+		return types.Image{}, err
+	}
+	if len(resp.Images) == 0 {
+		return types.Image{}, fmt.Errorf("AMI %s not found in %s", imageID, i.Region)
+	}
+
+	i.amiCache[imageID] = resp.Images[0]
+
+	return resp.Images[0], nil
+}
+
+func (i *instanceData) ImageName() (string, error) {
+	img, err := i.Image()
+	if err != nil {
+		return "", err
+	}
+
+	return *img.Name, nil
 }
 
 type tags map[string]string
@@ -56,17 +95,6 @@ func (t tags) String() string {
 
 	slices.Sort(pairs)
 	return strings.Join(pairs, " ")
-}
-
-func (i *instanceData) Tags() tags {
-	if i.tags == nil {
-		i.tags = make(tags, len(i.I.Tags))
-		for _, t := range i.I.Tags {
-			i.tags[*t.Key] = *t.Value
-		}
-	}
-
-	return i.tags
 }
 
 func (i *instanceData) SSM() (*ssmtypes.InstanceInformation, error) {

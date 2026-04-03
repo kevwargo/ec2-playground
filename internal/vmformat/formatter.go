@@ -24,6 +24,7 @@ type Formatter struct {
 	session  *session.Regional
 	tmpl     *template.Template
 	ssmCache *ssmCache
+	amiCache map[string]types.Image
 }
 
 func New(sess *session.Regional, tmpl *template.Template) Formatter {
@@ -31,6 +32,7 @@ func New(sess *session.Regional, tmpl *template.Template) Formatter {
 		session:  sess,
 		tmpl:     tmpl,
 		ssmCache: initSSMCache(sess),
+		amiCache: make(map[string]types.Image),
 	}
 }
 
