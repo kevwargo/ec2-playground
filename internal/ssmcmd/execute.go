@@ -28,11 +28,6 @@ type ExecuteInput struct {
 }
 
 func Execute(ctx context.Context, in ExecuteInput) error {
-	params, err := in.Cfg.BuildParams()
-	if err != nil {
-		return err
-	}
-
 	resources, err := infra.NewFetcher(in.Sess, config.InfraConfig{
 		StackName:  infra.DefaultStackName,
 		SkipDeploy: true,
@@ -41,12 +36,16 @@ func Execute(ctx context.Context, in ExecuteInput) error {
 		return err
 	}
 
+	if err := in.Cfg.Document.Resolve(ctx, resources.Bucket, in.Sess.S3()); err != nil {
+		return err
+	}
+
 	resp, err := in.Sess.SSM().SendCommand(ctx, &ssm.SendCommandInput{
-		DocumentName:       in.Cfg.Document.Name(),
+		DocumentName:       &in.Cfg.Document.Name,
 		InstanceIds:        in.InstanceIds,
 		OutputS3BucketName: &resources.Bucket,
 		OutputS3KeyPrefix:  aws.String("ssm-command-logs"),
-		Parameters:         params,
+		Parameters:         in.Cfg.Document.Params,
 		NotificationConfig: &ssmtypes.NotificationConfig{
 			NotificationArn:    &resources.CmdNotification,
 			NotificationType:   ssmtypes.NotificationTypeInvocation,
@@ -60,12 +59,21 @@ func Execute(ctx context.Context, in ExecuteInput) error {
 
 	in.Sess.Log("Command %s started", *resp.Command.CommandId)
 
-	return watchCommand(ctx, watchInput{
+	err = watchCommand(ctx, watchInput{
 		sess:       in.Sess,
 		cmd:        resp.Command,
 		queue:      resources.CmdNotificationQueue,
 		outputsDir: in.Cfg.OutputsDir,
 	})
+	if err != nil {
+		return err
+	}
+
+	if in.Cfg.Document.upload != nil {
+		err = in.Cfg.Document.upload.save(ctx, in.Sess.S3())
+	}
+
+	return err
 }
 
 type watchInput struct {

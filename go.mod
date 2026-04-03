@@ -12,6 +12,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/sqs v1.42.10
 	github.com/aws/aws-sdk-go-v2/service/ssm v1.50.0
 	github.com/aws/smithy-go v1.24.0
+	github.com/google/uuid v1.6.0
 	github.com/spf13/cobra v1.10.1
 )
 

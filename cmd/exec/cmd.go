@@ -28,10 +28,10 @@ func Command(sess *session.Global) *cobra.Command {
 	cmd.Use = "exec"
 	cmd.Short = "Execute SSM command on EC2 instances"
 
-	cmd.Flags().VarP(&cfg.Document, flagDocument, "d", "SSM document name/ARN")
-	cmd.Flags().VarP(&cfg.Params, "parameters", "p", "A list of parameters to pass to the SSM document")
-	cmd.Flags().StringVarP(&cfg.InlineScript, flagInlineScript, "c", "", "Script content passed as literal string")
-	cmd.Flags().StringVarP(&cfg.ScriptFile, flagScriptFile, "s", "", "Filename with script content")
+	cmd.Flags().StringVarP(&cfg.Document.Name, flagDocument, "d", "", "SSM document name/ARN")
+	cmd.Flags().VarP(&cfg.Document.Params, "parameters", "p", "A list of parameters to pass to the SSM document")
+	cmd.Flags().StringVarP(&cfg.Document.InlineScript, flagInlineScript, "c", "", "Script content passed as literal string")
+	cmd.Flags().StringVarP(&cfg.Document.ScriptFile, flagScriptFile, "s", "", "Filename with script content")
 	cmd.Flags().StringVarP(
 		&cfg.OutputsDir,
 		"outputs-dir",
