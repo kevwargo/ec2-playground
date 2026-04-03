@@ -15,6 +15,7 @@
 
 - Specify private key
 - Use exported / guess / specify username
+
 #### SSM
 
 - Specify bucket
@@ -27,7 +28,13 @@
   - instance Name
 - Show directly
 
+## TUI
+
+- Quick selection of policy/profile (also recently used)
+- Quick image search (also recently used)
+
 ## Misc
 
 - Quick region change (euw1, apne2, etc.)
 - Add help for all possible formatting directives for "ls -f ..."
+- Log background remmina process to some file
