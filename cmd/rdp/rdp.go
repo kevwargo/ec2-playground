@@ -169,12 +169,7 @@ func runRemmina(data rdpData) error {
 		return err
 	}
 
-	cmd := exec.Command(remminaCmd, "-c", uri)
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	return cmd.Run()
+	return exec.Command(remminaCmd, "-c", uri).Start()
 }
 
 func buildRemminaURI(data rdpData) (string, error) {
