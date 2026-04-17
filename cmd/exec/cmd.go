@@ -33,12 +33,14 @@ func Command(sess *session.Global) *cobra.Command {
 	cmd.Flags().StringVarP(&cfg.Document.InlineScript, flagInlineScript, "c", "", "Script content passed as literal string")
 	cmd.Flags().StringVarP(&cfg.Document.ScriptFile, flagScriptFile, "s", "", "Filename with script content")
 	cmd.Flags().StringVarP(
-		&cfg.OutputsDir,
+		&cfg.Outcfg.Dir,
 		"outputs-dir",
 		"o",
 		"",
 		"A directory to store execution outputs in. Defaults to the SSM command ID.",
 	)
+	cmd.Flags().BoolVarP(&cfg.Outcfg.Ignore, "quiet", "q", false, "Ignore SSM command output")
+	cmd.Flags().BoolVarP(&cfg.Outcfg.Dump, "dump-output", "O", false, "Dump all SSM command output to stdout directly")
 
 	cmd.MarkFlagRequired(flagDocument)
 	cmd.MarkFlagsMutuallyExclusive(flagInlineScript, flagScriptFile)

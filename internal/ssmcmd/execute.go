@@ -21,10 +21,21 @@ import (
 	"kevwargo/ec2-playground/internal/session"
 )
 
+type Config struct {
+	Document Document
+	Outcfg   OutputConfig
+}
+
 type ExecuteInput struct {
 	Cfg         Config
 	Sess        *session.Regional
 	InstanceIds []string
+}
+
+type OutputConfig struct {
+	Ignore bool
+	Dump   bool
+	Dir    string
 }
 
 func Execute(ctx context.Context, in ExecuteInput) error {
@@ -36,7 +47,7 @@ func Execute(ctx context.Context, in ExecuteInput) error {
 		return err
 	}
 
-	if err := in.Cfg.Document.Resolve(ctx, resources.Bucket, in.Sess.S3()); err != nil {
+	if err := in.Cfg.Document.resolve(); err != nil {
 		return err
 	}
 
@@ -60,27 +71,23 @@ func Execute(ctx context.Context, in ExecuteInput) error {
 	in.Sess.Log("Command %s started", *resp.Command.CommandId)
 
 	err = watchCommand(ctx, watchInput{
-		sess:       in.Sess,
-		cmd:        resp.Command,
-		queue:      resources.CmdNotificationQueue,
-		outputsDir: in.Cfg.OutputsDir,
+		sess:   in.Sess,
+		cmd:    resp.Command,
+		queue:  resources.CmdNotificationQueue,
+		outcfg: in.Cfg.Outcfg,
 	})
 	if err != nil {
 		return err
-	}
-
-	if in.Cfg.Document.upload != nil {
-		err = in.Cfg.Document.upload.save(ctx, in.Sess.S3())
 	}
 
 	return err
 }
 
 type watchInput struct {
-	sess       *session.Regional
-	cmd        *ssmtypes.Command
-	queue      string
-	outputsDir string
+	sess   *session.Regional
+	cmd    *ssmtypes.Command
+	queue  string
+	outcfg OutputConfig
 }
 
 func watchCommand(ctx context.Context, in watchInput) error {
@@ -106,12 +113,12 @@ func watchCommand(ctx context.Context, in watchInput) error {
 				in.sess.Log("%s: %s (%s)", change.instanceID, change.current, change.source)
 			}
 
-			if !change.current.isPending() {
-				if err = downloadAllOutputs(ctx, downloadAllInput{
+			if !in.outcfg.Ignore && !change.current.isPending() {
+				if err = processInstanceOutputs(ctx, instanceOutputs{
 					sess:       in.sess,
 					cmd:        in.cmd,
 					instanceID: change.instanceID,
-					outputsDir: in.outputsDir,
+					outcfg:     in.outcfg,
 				}); err != nil {
 					return err
 				}
@@ -261,17 +268,16 @@ func (s commandState) applyChanges(notifications []commandNotification) (changes
 	return changes
 }
 
-type downloadAllInput struct {
+type instanceOutputs struct {
 	sess       *session.Regional
 	cmd        *ssmtypes.Command
 	instanceID string
-	outputsDir string
+	outcfg     OutputConfig
 }
 
-func downloadAllOutputs(ctx context.Context, in downloadAllInput) error {
-	outdir := in.outputsDir
-	if outdir == "" {
-		outdir = *in.cmd.CommandId
+func processInstanceOutputs(ctx context.Context, in instanceOutputs) error {
+	if !in.outcfg.Dump && in.outcfg.Dir == "" {
+		in.outcfg.Dir = *in.cmd.CommandId
 	}
 
 	prefix := fmt.Sprintf("%s/%s/%s", *in.cmd.OutputS3KeyPrefix, *in.cmd.CommandId, in.instanceID)
@@ -287,13 +293,13 @@ func downloadAllOutputs(ctx context.Context, in downloadAllInput) error {
 		}
 
 		for _, obj := range resp.Contents {
-			if err = downloadSingleOutput(ctx, downloadSingleInput{
+			if err = processSingleOutput(ctx, singleOutput{
 				sess:       in.sess,
 				bucket:     *in.cmd.OutputS3BucketName,
 				prefix:     prefix,
 				key:        *obj.Key,
 				instanceID: in.instanceID,
-				outdir:     outdir,
+				outcfg:     in.outcfg,
 			}); err != nil {
 				return err
 			}
@@ -303,16 +309,16 @@ func downloadAllOutputs(ctx context.Context, in downloadAllInput) error {
 	return nil
 }
 
-type downloadSingleInput struct {
+type singleOutput struct {
 	sess       *session.Regional
 	bucket     string
 	prefix     string
 	key        string
 	instanceID string
-	outdir     string
+	outcfg     OutputConfig
 }
 
-func downloadSingleOutput(ctx context.Context, in downloadSingleInput) error {
+func processSingleOutput(ctx context.Context, in singleOutput) error {
 	url := fmt.Sprintf("s3://%s/%s", in.bucket, in.key)
 
 	if !strings.HasPrefix(in.key, in.prefix) {
@@ -329,21 +335,29 @@ func downloadSingleOutput(ctx context.Context, in downloadSingleInput) error {
 	}
 	defer resp.Body.Close()
 
-	path := fmt.Sprintf("%s/%s/%s", in.outdir, in.instanceID, strings.TrimLeft(strings.TrimPrefix(in.key, in.prefix), "/"))
-	if err = os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return fmt.Errorf("creating dir %s: %w", filepath.Dir(path), err)
+	var out io.Writer
+
+	if in.outcfg.Dump {
+		out = os.Stdout
+	} else {
+		path := fmt.Sprintf("%s/%s/%s", in.outcfg.Dir, in.instanceID, strings.TrimLeft(strings.TrimPrefix(in.key, in.prefix), "/"))
+		if err = os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			return fmt.Errorf("creating dir %s: %w", filepath.Dir(path), err)
+		}
+
+		f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY, 0o644)
+		if err != nil {
+			return fmt.Errorf("opening %s: %w", path, err)
+		}
+		defer f.Close()
+
+		out = f
+		in.sess.Log("Downloading %s -> %s...", url, path)
 	}
 
-	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY, 0o644)
-	if err != nil {
-		return fmt.Errorf("opening %s: %w", path, err)
-	}
-
-	if _, err = io.Copy(f, resp.Body); err != nil {
+	if _, err = io.Copy(out, resp.Body); err != nil {
 		return fmt.Errorf("reading %s: %w", url, err)
 	}
-
-	in.sess.Log("%s -> %s", url, path)
 
 	return nil
 }

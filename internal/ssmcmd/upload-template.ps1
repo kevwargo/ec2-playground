@@ -3,14 +3,9 @@ Add-Type -AssemblyName System.IO.Compression.FileSystem
 
 $ErrorActionPreference = "Stop"
 
-# Paths
-$sourceDir = "{{ .Dir }}"
-$zipPath   = "{{ .ZipPath }}"
-
-# Pre-signed S3 URL
+$zipPath = "{{ .ZipPath }}"
 $presignedUrl = "{{ .URL }}"
 
-# Remove existing ZIP if it exists
 if (Test-Path $zipPath) {
     Remove-Item $zipPath -Force
 }
@@ -18,9 +13,13 @@ if (Test-Path $zipPath) {
 $zipStream = [System.IO.File]::Open($zipPath, [System.IO.FileMode]::Create)
 $zip = New-Object System.IO.Compression.ZipArchive($zipStream, [System.IO.Compression.ZipArchiveMode]::Create)
 
-Get-ChildItem -Path $sourceDir -Recurse -File -ErrorAction SilentlyContinue | ForEach-Object {
-    if (! $_.FullName.EndsWith('.exe')) {
-        $relativePath = $_.FullName.Substring($sourceDir.Length).TrimStart('\')
+foreach ($sourceDir in @(
+{{range .Paths}}"{{ . }}"
+{{end}}
+)) {
+    Get-ChildItem -Path $sourceDir -Recurse -File -ErrorAction SilentlyContinue | ForEach-Object {
+        {{if .Exclude -}} if ($_.FullName -match '{{ .Exclude }}') { Write-Host "Excluding: $($_.FullName)" } else { {{- end}}
+        $relativePath = (Split-Path $_.FullName -NoQualifier).TrimStart('\')
 
         try {
             $entry = $zip.CreateEntry($relativePath)
@@ -32,12 +31,10 @@ Get-ChildItem -Path $sourceDir -Recurse -File -ErrorAction SilentlyContinue | Fo
 
             $fileStream.Close()
             $entryStream.Close()
-        }
-        catch {
+        } catch {
             Write-Warning "Skipping: $($_.FullName)"
         }
-    } else {
-        Write-Host "Skipping: $($_.FullName)"
+        {{if .Exclude -}} } {{- end}}
     }
 }
 

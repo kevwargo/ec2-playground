@@ -7,6 +7,7 @@ import (
 	"github.com/aws/smithy-go"
 	"github.com/spf13/cobra"
 
+	"kevwargo/ec2-playground/cmd/download"
 	dumpinfra "kevwargo/ec2-playground/cmd/dump-infra"
 	"kevwargo/ec2-playground/cmd/exec"
 	"kevwargo/ec2-playground/cmd/images"
@@ -62,6 +63,7 @@ func addCommands(rootCmd *cobra.Command, sess *session.Global) {
 		images.Command(sess),
 		dumpinfra.Command(sess),
 		exec.Command(sess),
+		download.Command(sess),
 		ssh.Command(),
 		s3.Command(sess),
 	)
