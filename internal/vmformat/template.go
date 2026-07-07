@@ -19,7 +19,7 @@ type instanceData struct {
 	Type   string
 	State  string
 	Region string
-	Tags   map[string]string
+	Tags   tags
 
 	ctx context.Context
 
@@ -37,7 +37,7 @@ func (f Formatter) prepareInstanceData(ctx context.Context, instance types.Insta
 		Type:   string(instance.InstanceType),
 		State:  string(instance.State.Name),
 		Region: f.session.Region,
-		Tags:   make(map[string]string, len(instance.Tags)),
+		Tags:   make(tags, len(instance.Tags)),
 
 		ctx:      ctx,
 		ssm:      f.session.SSM(),
