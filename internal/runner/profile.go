@@ -96,8 +96,7 @@ func (b *profileBuilder) profileExists(ctx context.Context, name string) (bool, 
 		return true, nil
 	}
 
-	var nse *types.NoSuchEntityException
-	if errors.As(err, &nse) {
+	if _, ok := errors.AsType[*types.NoSuchEntityException](err); ok {
 		return false, nil
 	}
 

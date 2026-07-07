@@ -52,7 +52,7 @@ func (r InstanceRunner) deployKey(ctx context.Context, key sshKey) error {
 		KeyNames: []string{key.name},
 	})
 	if err != nil {
-		if ae := smithy.APIError(nil); !errors.As(err, &ae) || ae.ErrorCode() != "InvalidKeyPair.NotFound" {
+		if ae, ok := errors.AsType[smithy.APIError](err); !(ok && ae.ErrorCode() == "InvalidKeyPair.NotFound") {
 			return err
 		}
 	}
@@ -118,7 +118,7 @@ func collectOutput(cmd *exec.Cmd) ([]byte, error) {
 	}
 
 	var stderr string
-	if ee := (*exec.ExitError)(nil); errors.As(err, &ee) {
+	if ee, ok := errors.AsType[*exec.ExitError](err); ok {
 		stderr = "\n" + string(ee.Stderr)
 	}
 

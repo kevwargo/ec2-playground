@@ -178,7 +178,7 @@ func buildRemminaURI(data rdpData) (string, error) {
 	cmd := initRemminaEncryptionCmd(data.password, &output)
 
 	if err := cmd.Run(); err != nil {
-		if ee := (&exec.ExitError{}); errors.As(err, &ee) {
+		if ee, ok := errors.AsType[*exec.ExitError](err); ok {
 			if ee.ExitCode() != 0 && ee.ExitCode() != 1 {
 				return "", err
 			}
