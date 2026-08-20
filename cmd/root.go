@@ -34,6 +34,13 @@ func Execute() error {
 	}
 
 	rootCmd.PersistentFlags().StringSliceVarP(&sess.Regions, "regions", "r", nil, "List of regions, comma-separated")
+	rootCmd.PersistentFlags().StringSliceVarP(
+		&sess.ExcludeRegions,
+		"exclude-regions",
+		"R",
+		nil,
+		"Comma-separated list of regions to exclude, automatically enables '-r all'",
+	)
 	rootCmd.PersistentFlags().BoolVarP(
 		&sess.IgnoreAccessErrors,
 		"ignore-access-errors",

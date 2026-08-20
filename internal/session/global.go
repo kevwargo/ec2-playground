@@ -20,6 +20,7 @@ type Global struct {
 	IgnoreAccessErrors bool
 	HTTPTimeoutSeconds int
 	SkipConnErrRetry   bool
+	ExcludeRegions     []string
 
 	regional        map[string]*Regional
 	defaultRegional *Regional
@@ -33,7 +34,7 @@ func (g *Global) init(ctx context.Context) error {
 		return nil
 	}
 
-	if len(g.Regions) == 1 && g.Regions[0] == "all" {
+	if len(g.Regions) == 1 && g.Regions[0] == "all" || len(g.ExcludeRegions) > 0 {
 		return g.resolveAll(ctx)
 	}
 
@@ -92,7 +93,7 @@ func (g *Global) resolveAll(ctx context.Context) error {
 
 	regions := make([]string, 0, len(resp.Regions)-1)
 	for _, r := range resp.Regions {
-		if *r.RegionName != g.defaultRegional.cfg.Region {
+		if *r.RegionName != g.defaultRegional.cfg.Region && !slices.Contains(g.ExcludeRegions, *r.RegionName) {
 			regions = append(regions, *r.RegionName)
 		}
 	}
