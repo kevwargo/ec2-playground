@@ -49,9 +49,9 @@ func (g *Global) loadConfig(ctx context.Context, region string) (aws.Config, err
 	var opts []func(*config.LoadOptions) error
 
 	if g.HTTPTimeoutSeconds > 0 {
-		opts = append(opts, config.WithHTTPClient(
-			awshttp.NewBuildableClient().WithTimeout(time.Duration(g.HTTPTimeoutSeconds)*time.Second),
-		))
+		timeout := time.Duration(g.HTTPTimeoutSeconds) * time.Second
+		client := awshttp.NewBuildableClient().WithTimeout(timeout)
+		opts = append(opts, config.WithHTTPClient(client))
 	}
 
 	if g.SkipConnErrRetry {
