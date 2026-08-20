@@ -18,5 +18,5 @@ func (g *Global) RunIAM(ctx context.Context, run func(context.Context, *iam.Clie
 		g.iam = iam.NewFromConfig(g.defaultRegional.cfg)
 	}
 
-	return run(ctx, g.iam)
+	return g.maybeIgnoreError(run(ctx, g.iam))
 }

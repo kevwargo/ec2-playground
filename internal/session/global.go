@@ -3,16 +3,23 @@ package session
 import (
 	"context"
 	"errors"
+	"slices"
 	"sync"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/aws/retry"
+	awshttp "github.com/aws/aws-sdk-go-v2/aws/transport/http"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/iam"
 )
 
 type Global struct {
-	Regions []string
+	Regions            []string
+	IgnoreAccessErrors bool
+	HTTPTimeoutSeconds int
+	SkipConnErrRetry   bool
 
 	regional        map[string]*Regional
 	defaultRegional *Regional
@@ -35,6 +42,39 @@ func (g *Global) init(ctx context.Context) error {
 	}
 
 	return g.resolveLiteral(ctx, g.Regions)
+}
+
+func (g *Global) loadConfig(ctx context.Context, region string) (aws.Config, error) {
+	var opts []func(*config.LoadOptions) error
+
+	if g.HTTPTimeoutSeconds > 0 {
+		opts = append(opts, config.WithHTTPClient(
+			awshttp.NewBuildableClient().WithTimeout(time.Duration(g.HTTPTimeoutSeconds)*time.Second),
+		))
+	}
+
+	if g.SkipConnErrRetry {
+		opts = append(opts, config.WithRetryer(func() aws.Retryer {
+			retryables := slices.DeleteFunc(
+				slices.Clone(retry.DefaultRetryables),
+				func(r retry.IsErrorRetryable) bool {
+					_, ok := r.(retry.RetryableConnectionError)
+					return ok
+				},
+			)
+
+			return retry.NewStandard(func(so *retry.StandardOptions) {
+				so.MaxAttempts = 3
+				so.Retryables = retryables
+			})
+		}))
+	}
+
+	if region != "" {
+		opts = append(opts, config.WithRegion(region))
+	}
+
+	return config.LoadDefaultConfig(ctx, opts...)
 }
 
 func (g *Global) resolveAll(ctx context.Context) error {
@@ -61,7 +101,7 @@ func (g *Global) resolveAll(ctx context.Context) error {
 }
 
 func (g *Global) resolveDefault(ctx context.Context) error {
-	cfg, err := config.LoadDefaultConfig(ctx)
+	cfg, err := g.loadConfig(ctx, "")
 	if err != nil {
 		return err
 	}
@@ -86,7 +126,7 @@ func (g *Global) resolveLiteral(ctx context.Context, regions []string) error {
 
 	for _, region := range regions {
 		go func() {
-			cfg, err := config.LoadDefaultConfig(ctx, config.WithRegion(region))
+			cfg, err := g.loadConfig(ctx, region)
 			respC <- resolveResp{
 				cfg: cfg,
 				err: err,

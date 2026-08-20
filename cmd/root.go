@@ -1,10 +1,8 @@
 package cmd
 
 import (
-	"errors"
 	"os"
 
-	"github.com/aws/smithy-go"
 	"github.com/spf13/cobra"
 
 	"kevwargo/ec2-playground/cmd/download"
@@ -24,10 +22,7 @@ import (
 )
 
 func Execute() error {
-	var (
-		sess               session.Global
-		ignoreAccessErrors bool
-	)
+	var sess session.Global
 
 	rootCmd := &cobra.Command{
 		Use:           "ec2",
@@ -39,20 +34,29 @@ func Execute() error {
 	}
 
 	rootCmd.PersistentFlags().StringSliceVarP(&sess.Regions, "regions", "r", nil, "List of regions, comma-separated")
-	rootCmd.PersistentFlags().BoolVarP(&ignoreAccessErrors, "ignore-access-errors", "X", false, "Silently ignore AWS API errors originating from insufficient permissions")
+	rootCmd.PersistentFlags().BoolVarP(
+		&sess.IgnoreAccessErrors,
+		"ignore-access-errors",
+		"X",
+		false,
+		"Silently ignore AWS API errors originating from insufficient permissions",
+	)
+	rootCmd.PersistentFlags().IntVar(&sess.HTTPTimeoutSeconds, "timeout", 0, "HTTP request timeout in seconds")
+	rootCmd.PersistentFlags().BoolVarP(
+		&sess.SkipConnErrRetry,
+		"no-retry-conn-err",
+		"E",
+		false,
+		"Don't retry network connection errors",
+	)
 
 	addCommands(rootCmd, &sess)
 
-	err := rootCmd.Execute()
-	if ignoreAccessErrors && err != nil {
-		err = ignoreError(err)
-	}
-
-	return err
+	return rootCmd.Execute()
 }
 
 func addCommands(rootCmd *cobra.Command, sess *session.Global) {
-	rootCmd.AddCommand(
+	cmds := []*cobra.Command{
 		run.Command(sess),
 		ls.Command(sess),
 		rm.Command(sess),
@@ -66,7 +70,14 @@ func addCommands(rootCmd *cobra.Command, sess *session.Global) {
 		download.Command(sess),
 		ssh.Command(),
 		s3.Command(sess),
-	)
+	}
+
+	rootCmd.AddCommand(cmds...)
+
+	for _, c := range cmds {
+		// Catch flag shorthand conflict early for all commands
+		c.InheritedFlags()
+	}
 
 	rootCmd.AddCommand(&cobra.Command{
 		Use:   "bash_completion",
@@ -75,35 +86,4 @@ func addCommands(rootCmd *cobra.Command, sess *session.Global) {
 			cmd.Root().GenBashCompletion(os.Stdout)
 		},
 	})
-}
-
-func ignoreError(err error) error {
-	var (
-		opErr  *smithy.OperationError
-		apiErr smithy.APIError
-	)
-
-	if !(errors.As(err, &opErr) && errors.As(err, &apiErr)) {
-		return err
-	}
-
-	for _, ignored := range ignoredAccessErrors {
-		if opErr.ServiceID == ignored.service && apiErr.ErrorCode() == ignored.errorCode {
-			return nil
-		}
-	}
-
-	return err
-}
-
-type awsErrorPattern struct {
-	service   string
-	errorCode string
-}
-
-var ignoredAccessErrors = []awsErrorPattern{
-	{"EC2", "UnauthorizedOperation"},
-	{"EC2", "AuthFailure"},
-	{"CloudFormation", "AccessDenied"},
-	{"SSM", "AccessDeniedException"},
 }
