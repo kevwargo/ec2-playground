@@ -89,8 +89,7 @@ func (w *statusWaiter) logEvents(ctx context.Context) error {
 
 	w.lastEventID = *events[0].EventId
 
-	for i := len(events) - 1; i >= 0; i-- {
-		e := events[i]
+	for _, e := range slices.Backward(events) {
 		timestamp := e.Timestamp.Format(time.RFC3339)
 		w.session.Log("%s: [%s] %s | %s", timestamp, e.ResourceStatus, *e.ResourceType, *e.LogicalResourceId)
 	}

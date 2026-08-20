@@ -165,7 +165,7 @@ func promptSelector() (selector, error) {
 	}
 
 	s := selector{include: make(map[int]bool)}
-	for _, group := range strings.Split(resp, ",") {
+	for group := range strings.SplitSeq(resp, ",") {
 		include := true
 		if strings.HasPrefix(group, "!") {
 			include = false

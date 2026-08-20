@@ -55,7 +55,7 @@ func (d *Document) resolveScriptContent() error {
 		body = bytes.ReplaceAll(body, []byte{'\r'}, []byte{})
 
 		d.Params["commands"] = make([]string, 0)
-		for _, line := range bytes.Split(body, []byte{'\n'}) {
+		for line := range bytes.SplitSeq(body, []byte{'\n'}) {
 			d.Params["commands"] = append(d.Params["commands"], string(line))
 		}
 	} else if len(d.Params["commands"]) == 0 {
