@@ -116,7 +116,11 @@ func profileNotReady(err error, profileName string) bool {
 }
 
 func (r InstanceRunner) buildParams(ctx context.Context, resources infra.Resources) (runParams, error) {
-	in := r.createBasicInput(resources)
+	in := r.createBasicInput()
+
+	if err := r.resolveNetworking(ctx, &in, resources); err != nil {
+		return runParams{}, err
+	}
 
 	waitForProfile, err := r.setProfile(ctx, &in, resources)
 	if err != nil {
@@ -163,7 +167,7 @@ func (r InstanceRunner) buildParams(ctx context.Context, resources infra.Resourc
 	}, nil
 }
 
-func (r InstanceRunner) createBasicInput(resources infra.Resources) ec2.RunInstancesInput {
+func (r InstanceRunner) createBasicInput() ec2.RunInstancesInput {
 	in := ec2.RunInstancesInput{
 		InstanceType: types.InstanceType(r.cfg.Type),
 		DryRun:       aws.Bool(r.cfg.DryRun),
@@ -176,19 +180,6 @@ func (r InstanceRunner) createBasicInput(resources infra.Resources) ec2.RunInsta
 
 	if r.cfg.AllowIMDSv1 {
 		in.MetadataOptions.HttpTokens = types.HttpTokensStateOptional
-	}
-
-	if resources.Subnet != "" {
-		in.NetworkInterfaces = []types.InstanceNetworkInterfaceSpecification{
-			{
-				DeviceIndex:              aws.Int32(0),
-				Groups:                   []string{resources.SecurityGroup},
-				AssociatePublicIpAddress: aws.Bool(!r.cfg.SkipPublicIPv4),
-				SubnetId:                 &resources.Subnet,
-			},
-		}
-	} else {
-		in.SecurityGroupIds = []string{resources.SecurityGroup}
 	}
 
 	return in

@@ -1,5 +1,4 @@
-Description:
-  A set of resources used by the EC2 Playground
+Description: A set of resources used by the EC2 Playground
 
 Parameters:
   DefaultVPC:
@@ -96,7 +95,7 @@ Resources:
       GatewayId: !Ref IGW
       RouteTableId: !Ref RouteTable
 
-  SecurityGroup:
+  SecurityGroupEgress:
     Type: AWS::EC2::SecurityGroup
     Properties:
       VpcId: !If
@@ -109,15 +108,6 @@ Resources:
           IpProtocol: -1
         - CidrIpv6: ::0/0
           IpProtocol: -1
-      SecurityGroupIngress:
-        - CidrIp: 0.0.0.0/0
-          IpProtocol: tcp
-          FromPort: 22
-          ToPort: 22
-        - CidrIp: 0.0.0.0/0
-          IpProtocol: tcp
-          FromPort: 3389
-          ToPort: 3389
 
   Bucket:
     Type: AWS::S3::Bucket
@@ -226,8 +216,14 @@ Resources:
         - !Ref CmdNotificationQueue
 
 Outputs:
-  SecurityGroup:
-    Value: !Ref SecurityGroup
+  VpcId:
+    Value: !If
+      - CreateVPC
+      - !Ref VPC
+      - !Ref DefaultVPC
+
+  SecurityGroupEgress:
+    Value: !Ref SecurityGroupEgress
 
   Subnet:
     Condition: CreateVPC

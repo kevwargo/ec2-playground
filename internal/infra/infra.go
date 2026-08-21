@@ -42,7 +42,8 @@ const (
 )
 
 type Resources struct {
-	SecurityGroup        string `json:"SecurityGroup"`
+	VpcId                string `json:"VpcId"`
+	SecurityGroupEgress  string `json:"SecurityGroupEgress"`
 	Subnet               string `json:"Subnet"`
 	InstancePolicy       string `json:"InstancePolicy"`
 	InstanceProfile      string `json:"InstanceProfile"`

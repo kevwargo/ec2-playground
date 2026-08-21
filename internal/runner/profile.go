@@ -2,12 +2,9 @@ package runner
 
 import (
 	"context"
-	"crypto/md5"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"slices"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
@@ -192,17 +189,9 @@ func (b *profileBuilder) createProfile(ctx context.Context, profileName, roleNam
 }
 
 func (b *profileBuilder) computePoliciesHash() string {
-	h := md5.New()
-
 	policies := []string{b.defaultPolicy, ssmPolicy}
 	policies = append(policies, b.userPolicies...)
-	slices.Sort(policies)
-
-	for _, policy := range policies {
-		h.Write([]byte(policy))
-	}
-
-	policiesHash := base64.RawURLEncoding.EncodeToString(h.Sum(nil))
+	policiesHash := computeHash(policies)
 
 	b.session.Log("hash(%s) = %s", policies, policiesHash)
 

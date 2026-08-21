@@ -13,6 +13,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/ssm v1.70.0
 	github.com/aws/smithy-go v1.27.3
 	github.com/google/uuid v1.6.0
+	github.com/oriser/regroup v0.0.0-20240925165441-f6bb0e08289e
 	github.com/spf13/cobra v1.10.2
 )
 
@@ -33,4 +34,5 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/sts v1.44.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/spf13/pflag v1.0.9 // indirect
+	golang.org/x/exp v0.0.0-20230425010034-47ecfdc1ba53 // indirect
 )

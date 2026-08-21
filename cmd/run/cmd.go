@@ -45,6 +45,15 @@ func Command(sess *session.Global) *cobra.Command {
 	f.BoolVar(&cfg.SkipPublicIPv4, "skip-public-ipv4", false, "Don't assign an IPv4 address to the instance")
 	f.StringVarP(&cfg.UserData, "user-data", "u", "", "The script file containing user-data")
 	f.StringArrayVarP(&cfg.BlockMappings, "block-mappings", "B", nil, "Additional block device mappings")
+	f.StringArrayVarP(
+		&cfg.IPv4Ingress,
+		"ipv4-ingress",
+		"I",
+		nil,
+		"IPv4 ingress rules in format '[(tcp|udp)://]addr/mask:(port|portrange)'. Default protocol is TCP. "+
+			"Use multiple flags for multiple rules. Address might be specified as a keyword 'current' in which case "+
+			"it will be obtained via https://ifconfig.co/json.",
+	)
 	f.BoolVar(&cfg.AllowIMDSv1, "allow-imds-v1", false, "Allow tokenless instance metadata access")
 	f.BoolVar(&cfg.TerminateOnShutdown, "terminate-on-shutdown", false, "Terminate the instance on VM-initiated shutdown")
 

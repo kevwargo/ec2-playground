@@ -10,6 +10,7 @@ type RunConfig struct {
 	KeyPair             string
 	SSHPublicKeyFile    string
 	SkipPublicIPv4      bool
+	IPv4Ingress         []string
 	UserData            string
 	BlockMappings       []string
 	AllowIMDSv1         bool
