@@ -33,6 +33,7 @@ type ExecuteInput struct {
 }
 
 type OutputConfig struct {
+	Bucket string
 	Ignore bool
 	Dump   bool
 	Dir    string
@@ -47,6 +48,11 @@ func Execute(ctx context.Context, in ExecuteInput) error {
 		return err
 	}
 
+	bucket := in.Cfg.Outcfg.Bucket
+	if bucket == "" {
+		bucket = resources.Bucket
+	}
+
 	if err := in.Cfg.Document.resolve(); err != nil {
 		return err
 	}
@@ -54,7 +60,7 @@ func Execute(ctx context.Context, in ExecuteInput) error {
 	resp, err := in.Sess.SSM().SendCommand(ctx, &ssm.SendCommandInput{
 		DocumentName:       &in.Cfg.Document.Name,
 		InstanceIds:        in.InstanceIds,
-		OutputS3BucketName: &resources.Bucket,
+		OutputS3BucketName: &bucket,
 		OutputS3KeyPrefix:  aws.String("ssm-command-logs"),
 		Parameters:         in.Cfg.Document.Params,
 		NotificationConfig: &ssmtypes.NotificationConfig{

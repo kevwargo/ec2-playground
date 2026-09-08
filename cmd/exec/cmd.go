@@ -41,6 +41,7 @@ func Command(sess *session.Global) *cobra.Command {
 	)
 	cmd.Flags().BoolVarP(&cfg.Outcfg.Ignore, "quiet", "q", false, "Ignore SSM command output")
 	cmd.Flags().BoolVarP(&cfg.Outcfg.Dump, "dump-output", "O", false, "Dump all SSM command output to stdout directly")
+	cmd.Flags().StringVarP(&cfg.Outcfg.Bucket, "bucket", "b", "", "Custom bucket to store command outputs")
 
 	cmd.MarkFlagRequired(flagDocument)
 	cmd.MarkFlagsMutuallyExclusive(flagInlineScript, flagScriptFile)
