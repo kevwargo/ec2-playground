@@ -63,7 +63,11 @@ func (i *instanceData) Image() (types.Image, error) {
 		return cached, nil
 	}
 
-	resp, err := i.ec2.DescribeImages(i.ctx, &ec2.DescribeImagesInput{ImageIds: []string{imageID}})
+	resp, err := i.ec2.DescribeImages(i.ctx, &ec2.DescribeImagesInput{
+		ImageIds:          []string{imageID},
+		IncludeDeprecated: new(true),
+		IncludeDisabled:   new(true),
+	})
 	if err != nil {
 		return types.Image{}, err
 	}
@@ -76,13 +80,13 @@ func (i *instanceData) Image() (types.Image, error) {
 	return resp.Images[0], nil
 }
 
-func (i *instanceData) ImageName() (string, error) {
+func (i *instanceData) ImageName() string {
 	img, err := i.Image()
 	if err != nil {
-		return "", err
+		return fmt.Sprintf("ImageNameError: %q", err.Error())
 	}
 
-	return *img.Name, nil
+	return *img.Name
 }
 
 type tags map[string]string
