@@ -6,9 +6,9 @@ import (
 	"github.com/spf13/cobra"
 
 	"kevwargo/ec2-playground/cmd/download"
-	dumpinfra "kevwargo/ec2-playground/cmd/dump-infra"
 	"kevwargo/ec2-playground/cmd/exec"
 	"kevwargo/ec2-playground/cmd/images"
+	infracmd "kevwargo/ec2-playground/cmd/infra"
 	"kevwargo/ec2-playground/cmd/ls"
 	"kevwargo/ec2-playground/cmd/rdp"
 	"kevwargo/ec2-playground/cmd/rm"
@@ -67,12 +67,12 @@ func addCommands(rootCmd *cobra.Command, sess *session.Global) {
 		run.Command(sess),
 		ls.Command(sess),
 		rm.Command(sess),
+		infracmd.Command(sess),
 		start.Command(sess),
 		stop.Command(sess),
 		tag.Command(sess),
 		rdp.Command(sess),
 		images.Command(sess),
-		dumpinfra.Command(sess),
 		exec.Command(sess),
 		download.Command(sess),
 		ssh.Command(),
