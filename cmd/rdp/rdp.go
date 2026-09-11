@@ -128,14 +128,15 @@ func getMatchingInstance(ctx context.Context, ec2Client *ec2.Client, instanceSpe
 	for _, r := range resp.Reservations {
 		instances = append(instances, r.Instances...)
 	}
-	if len(instances) == 0 {
-		return types.Instance{}, fmt.Errorf("instance %q is not a running Windows instance", instanceSpec)
-	}
-	if len(instances) > 1 {
-		return types.Instance{}, fmt.Errorf("there are more than one running instance with the name %q", instanceSpec)
-	}
 
-	return instances[0], nil
+	switch count := len(instances); count {
+	case 0:
+		return types.Instance{}, fmt.Errorf("instance %q is not a running Windows instance", instanceSpec)
+	case 1:
+		return instances[0], nil
+	default:
+		return types.Instance{}, fmt.Errorf("there are %d running instances with the name %q", count, instanceSpec)
+	}
 }
 
 func decryptEC2Password(encPassword, sshKeyFile string) (string, error) {
